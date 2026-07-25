@@ -78,18 +78,31 @@ jobs:
         with:
           cache-read-only: false
 
-      - name: Set up Bun
+      - name: Set up and cache Bun runtime
         if: env.SKIP_TESTS != 'true'
+        id: setup-bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.14
+          no-cache: false
 
-      - name: Cache Playwright browsers
+      - name: Cache Bun packages
+        if: env.SKIP_TESTS != 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-packages-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('example/ui/bun.lock') }}
+          restore-keys: |
+            bun-packages-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Cache Playwright Chromium
         if: env.SKIP_TESTS != 'true'
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('gradle/libs.versions.toml') }}
+          key: playwright-chromium-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('gradle/libs.versions.toml') }}
+          restore-keys: |
+            playwright-chromium-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Configure git
         run: |
