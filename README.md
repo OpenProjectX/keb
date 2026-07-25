@@ -126,3 +126,22 @@ Use runtime properties to override the `@KebTest` defaults:
   -Dkeb.headless=false \
   -Dkeb.slowMoMillis=250
 ```
+
+## Releasing
+
+The [release workflow](.github/workflows/release.yml) runs on pushes to
+`master` and can also be started manually. It verifies the library and
+independent example, signs both publications, runs the Gradle Release Plugin,
+and closes/releases the Sonatype staging repository.
+
+Configure these GitHub Actions secrets:
+
+- `OSSRH_USERNAME`
+- `OSSRH_PASSWORD`
+- `SIGNING_KEY_ASC`
+- `SIGNING_KEY_PASSWORD`
+- `RELEASE_GITHUB_TOKEN` when the default workflow token cannot push release
+  commits and tags through branch protection
+
+The workflow publishes `keb-core` and `keb-junit5` under
+`org.openprojectx.test.keb`.
