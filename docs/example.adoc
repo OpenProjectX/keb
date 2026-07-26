@@ -15,11 +15,14 @@ The testing module resolves:
 
 [source,text]
 ----
-org.openprojectx.test.keb:keb-core:0.1.0-SNAPSHOT
-org.openprojectx.test.keb:keb-junit5:0.1.0-SNAPSHOT
+org.openprojectx.test.keb:keb-core:<kebVersion>
+org.openprojectx.test.keb:keb-junit5:<kebVersion>
 ----
 
 from the repository-local Maven directory at `build/example-maven`.
+`example/gradle.properties` supplies the default version for local use. CI
+passes the root project version explicitly so release version changes cannot
+leave the consumer on an older snapshot.
 
 == Run the complete example
 

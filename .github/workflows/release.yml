@@ -119,11 +119,17 @@ jobs:
       - name: Verify library and independent example
         if: env.SKIP_TESTS != 'true'
         run: |
+          keb_version="$(awk -F= '/^[[:space:]]*version[[:space:]]*=/{gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2); print $2; exit}' gradle.properties)"
+          if [ -z "$keb_version" ]; then
+            echo "Could not read version from gradle.properties" >&2
+            exit 1
+          fi
           ./gradlew --no-configuration-cache check \
             --stacktrace "--$GRADLE_LOG_LEVEL"
           ./gradlew --no-configuration-cache publishExampleArtifacts \
             --stacktrace "--$GRADLE_LOG_LEVEL"
-          ./gradlew -p example --no-configuration-cache check \
+          ./gradlew -p example --no-configuration-cache \
+            -PkebVersion="$keb_version" check \
             --stacktrace "--$GRADLE_LOG_LEVEL"
 
       - name: Write signing key
