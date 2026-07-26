@@ -9,6 +9,8 @@ val config = KebConfig(
     baseUrl = URI("https://example.test"),
     browser = KebBrowserName.CHROMIUM,
     headless = true,
+    browserChannel = null,
+    executablePath = null,
     slowMotion = 250.milliseconds,
     actionTimeout = 10.seconds,
     navigationTimeout = 30.seconds,
@@ -47,6 +49,12 @@ JVM system properties override annotation or programmatic defaults.
 
 |`keb.headless`
 |`true` or `false`
+
+|`keb.browserChannel`
+|`chrome`, `msedge`, or another Playwright Chromium channel
+
+|`keb.executablePath`
+|`/opt/company/chrome/chrome`
 
 |`keb.slowMoMillis`
 |`250`
@@ -115,3 +123,7 @@ configuration or `keb.artifactsDirectory`.
 Playwright Java objects are not shared between arbitrary threads. A
 `KebSession`, its context, and its page belong to one test execution. The JUnit
 extension favors isolation and creates a fresh session for every test.
+
+For browser installation behind a restricted corporate network, using an
+approved local Chrome installation, and preparing offline build agents, see
+link:corporate-network.adoc[Restricted Corporate Network Setup].

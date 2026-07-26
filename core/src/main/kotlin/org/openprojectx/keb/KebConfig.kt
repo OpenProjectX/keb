@@ -16,6 +16,8 @@ public data class KebConfig(
     val baseUrl: URI? = null,
     val browser: KebBrowserName = KebBrowserName.CHROMIUM,
     val headless: Boolean = true,
+    val browserChannel: String? = null,
+    val executablePath: Path? = null,
     val slowMotion: Duration? = null,
     val actionTimeout: Duration = 10.seconds,
     val navigationTimeout: Duration = 30.seconds,
@@ -26,6 +28,12 @@ public data class KebConfig(
         require(navigationTimeout.isPositive()) { "navigationTimeout must be positive" }
         require(slowMotion == null || !slowMotion.isNegative()) {
             "slowMotion must not be negative"
+        }
+        require(browserChannel == null || executablePath == null) {
+            "browserChannel and executablePath cannot both be configured"
+        }
+        require(browserChannel == null || browser == KebBrowserName.CHROMIUM) {
+            "browserChannel is supported only with the Chromium browser type"
         }
     }
 
@@ -46,6 +54,8 @@ public data class KebConfig(
          * - `keb.baseUrl`
          * - `keb.browser` (`chromium`, `firefox`, or `webkit`)
          * - `keb.headless`
+         * - `keb.browserChannel`
+         * - `keb.executablePath`
          * - `keb.slowMoMillis`
          * - `keb.actionTimeoutMillis`
          * - `keb.navigationTimeoutMillis`
@@ -73,6 +83,11 @@ public data class KebConfig(
                             )
                     }
                     ?: defaults.headless,
+                browserChannel = property("keb.browserChannel")
+                    ?: defaults.browserChannel,
+                executablePath = property("keb.executablePath")
+                    ?.let(Path::of)
+                    ?: defaults.executablePath,
                 slowMotion = property("keb.slowMoMillis")
                     ?.let { milliseconds("keb.slowMoMillis", it, allowZero = true) }
                     ?: defaults.slowMotion,

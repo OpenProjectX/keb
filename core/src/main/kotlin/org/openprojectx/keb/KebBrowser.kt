@@ -34,6 +34,8 @@ public class KebBrowser private constructor(
             }
             val launchOptions = BrowserType.LaunchOptions()
                 .setHeadless(config.headless)
+            config.browserChannel?.let(launchOptions::setChannel)
+            config.executablePath?.let(launchOptions::setExecutablePath)
             config.slowMotion?.let {
                 launchOptions.setSlowMo(it.inWholeMilliseconds.toDouble())
             }

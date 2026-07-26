@@ -41,6 +41,7 @@ screenshots.
 * link:getting-started.adoc[Getting started]
 * link:dsl.adoc[Pages, modules, and the Kotlin DSL]
 * link:configuration.adoc[Configuration and runtime properties]
+* link:corporate-network.adoc[Restricted corporate network setup]
 * link:example.adoc[Independent React and Material UI example]
 * link:releasing.adoc[Release process]
 

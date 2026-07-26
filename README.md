@@ -48,6 +48,9 @@ class LoginTest {
 See the [Keb documentation](docs/index.adoc) for setup, DSL usage,
 configuration, the independent example, and releasing.
 
+Corporate users can follow the
+[restricted network setup guide](docs/corporate-network.adoc).
+
 ## Build
 
 ```shell

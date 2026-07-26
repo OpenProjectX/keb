@@ -7,6 +7,8 @@ val kebPropertyNames = listOf(
     "keb.baseUrl",
     "keb.browser",
     "keb.headless",
+    "keb.browserChannel",
+    "keb.executablePath",
     "keb.slowMoMillis",
     "keb.actionTimeoutMillis",
     "keb.navigationTimeoutMillis",

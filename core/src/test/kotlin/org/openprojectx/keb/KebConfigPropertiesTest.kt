@@ -21,6 +21,7 @@ class KebConfigPropertiesTest {
         System.setProperty("keb.baseUrl", "http://127.0.0.1:8080")
         System.setProperty("keb.browser", "firefox")
         System.setProperty("keb.headless", "false")
+        System.setProperty("keb.executablePath", "/opt/browsers/firefox")
         System.setProperty("keb.slowMoMillis", "125")
         System.setProperty("keb.actionTimeoutMillis", "5000")
         System.setProperty("keb.navigationTimeoutMillis", "15000")
@@ -31,6 +32,7 @@ class KebConfigPropertiesTest {
         assertEquals(URI("http://127.0.0.1:8080"), config.baseUrl)
         assertEquals(KebBrowserName.FIREFOX, config.browser)
         assertFalse(config.headless)
+        assertEquals(Path.of("/opt/browsers/firefox"), config.executablePath)
         assertEquals(125.milliseconds, config.slowMotion)
         assertEquals(5000.milliseconds, config.actionTimeout)
         assertEquals(15000.milliseconds, config.navigationTimeout)
@@ -48,11 +50,33 @@ class KebConfigPropertiesTest {
         assertTrue(error.message.orEmpty().contains("keb.headless"))
     }
 
+    @Test
+    fun `browser channel and executable path are mutually exclusive`() {
+        assertThrows<IllegalArgumentException> {
+            KebConfig(
+                browserChannel = "chrome",
+                executablePath = Path.of("/opt/google/chrome/chrome"),
+            )
+        }
+    }
+
+    @Test
+    fun `branded browser channels require chromium`() {
+        assertThrows<IllegalArgumentException> {
+            KebConfig(
+                browser = KebBrowserName.FIREFOX,
+                browserChannel = "chrome",
+            )
+        }
+    }
+
     companion object {
         private val propertyNames = listOf(
             "keb.baseUrl",
             "keb.browser",
             "keb.headless",
+            "keb.browserChannel",
+            "keb.executablePath",
             "keb.slowMoMillis",
             "keb.actionTimeoutMillis",
             "keb.navigationTimeoutMillis",

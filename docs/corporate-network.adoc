@@ -1,0 +1,387 @@
+= Restricted Corporate Network Setup
+:toc:
+:toclevels: 3
+
+This guide is for developers and build agents that can reach an internal JFrog
+Artifactory instance but cannot reach public Maven, Gradle, Microsoft, npm,
+GitHub, or operating-system package endpoints.
+
+== What must be prepared
+
+A Maven proxy is necessary but is not sufficient.
+
+[cols="2,3,2"]
+|===
+|Item |Why it is needed |Typical internal source
+
+|JDK 17+
+|Runs Gradle, Kotlin, and Keb
+|Corporate workstation image or JDK archive repository
+
+|Gradle distribution
+|The wrapper downloads Gradle before repository settings are evaluated
+|JFrog generic repository or a pre-populated wrapper cache
+
+|Maven and Gradle plugin artifacts
+|Supplies Keb, Playwright, Kotlin, JUnit, and build plugins
+|JFrog Maven virtual repository
+
+|Browser
+|Playwright browser binaries are separate from Maven artifacts
+|Local Chrome/Edge, internal archive mirror, or preloaded browser cache
+
+|Native browser libraries
+|Browsers need operating-system libraries and fonts
+|Managed workstation/base image or internal apt/yum repository
+
+|Corporate CA certificates
+|Java, Bun, browsers, and command-line tools must trust internal TLS
+|Corporate PKI distribution
+
+|Bun and npm packages
+|Needed only for the repository's React example
+|Approved Bun binary and JFrog npm virtual repository
+|===
+
+GitHub Actions caches improve repeat-run speed, but a cold cache is not an
+artifact source. A new runner still needs an internal source or a prebuilt
+image.
+
+== Configure JFrog for Gradle
+
+=== Repository requirements
+
+For ordinary Keb consumers, a Maven virtual repository should contain or proxy:
+
+* released `org.openprojectx.test.keb` artifacts;
+* Maven Central;
+* Gradle Plugin Portal marker and implementation artifacts when the build uses
+  plugins from the portal.
+
+Snapshot users also need Keb snapshots copied to an internal local repository
+or proxied from an approved snapshot source.
+
+The Playwright Maven dependency contains its Java API and driver bundle. It
+does not contain the separately installed browsers.
+
+=== Settings example
+
+[source,kotlin]
+----
+pluginManagement {
+    repositories {
+        maven {
+            url = uri(System.getenv("JFROG_GRADLE_PLUGINS_URL"))
+            credentials {
+                username = System.getenv("JFROG_USERNAME")
+                password = System.getenv("JFROG_TOKEN")
+            }
+        }
+    }
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        maven {
+            url = uri(System.getenv("JFROG_MAVEN_URL"))
+            credentials {
+                username = System.getenv("JFROG_USERNAME")
+                password = System.getenv("JFROG_TOKEN")
+            }
+        }
+    }
+}
+----
+
+Do not commit credentials. Use environment variables, Gradle's credentials
+mechanism, or the organization's secret manager.
+
+An enterprise Gradle init script can enforce repositories across developer
+machines and CI agents. Test it against both the root build and the standalone
+`example` build because they have separate settings files.
+
+== Prepare the Gradle wrapper
+
+`gradlew` downloads the URL in
+`gradle/wrapper/gradle-wrapper.properties` before Gradle can use Maven
+repository settings.
+
+Choose one approach:
+
+. Copy or proxy the exact Gradle ZIP through a JFrog generic repository and
+  change `distributionUrl` to the internal HTTPS URL.
+. Pre-populate `GRADLE_USER_HOME/wrapper/dists` in workstation and CI images.
+. Distribute an approved Gradle installation through the corporate software
+  catalog.
+
+Keep `distributionSha256Sum` enabled and verify the internal file against the
+approved upstream checksum.
+
+Test with public network access disabled:
+
+[source,shell]
+----
+./gradlew --version
+----
+
+== Choose a browser strategy
+
+Commands in this guide that use `:core:playwright` operate in the Keb source
+repository. A consuming Gradle project can expose the same Playwright CLI:
+
+[source,kotlin]
+----
+tasks.register<JavaExec>("playwright") {
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("com.microsoft.playwright.CLI")
+}
+----
+
+Then replace `:core:playwright` with `playwright` in installation commands.
+
+=== Approved local Google Chrome or Microsoft Edge
+
+This is usually the simplest option when a browser is already installed and
+patched by endpoint management.
+
+Keb supports Playwright's branded Chromium channels:
+
+[source,shell]
+----
+export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+
+./gradlew test \
+  -Dkeb.browser=chromium \
+  -Dkeb.browserChannel=chrome
+----
+
+For the independent example:
+
+[source,shell]
+----
+export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+
+./gradlew -p example :testing:test \
+  -Dkeb.browser=chromium \
+  -Dkeb.browserChannel=chrome
+----
+
+PowerShell:
+
+[source,powershell]
+----
+$Env:PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1"
+./gradlew test -Dkeb.browser=chromium -Dkeb.browserChannel=chrome
+----
+
+Available Playwright channels include `chrome`, `chrome-beta`, `chrome-dev`,
+`chrome-canary`, `msedge`, `msedge-beta`, `msedge-dev`, and `msedge-canary`.
+
+Prefer `keb.browserChannel=chrome` over a hard-coded path. A channel locates the
+normal system installation and expresses the intended distribution. Enterprise
+browser policies can interfere with automation, so validate the organization's
+managed policy set.
+
+=== Explicit browser executable
+
+For a nonstandard installation:
+
+[source,shell]
+----
+export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+
+./gradlew test \
+  -Dkeb.browser=chromium \
+  -Dkeb.executablePath=/opt/company/chrome/chrome
+----
+
+`keb.browserChannel` and `keb.executablePath` are mutually exclusive.
+
+Playwright recommends its bundled browser and warns that arbitrary executables
+may be incompatible. Use an explicit path only when the organization tests and
+controls the browser and Playwright version combination.
+
+=== Internal Playwright download mirror
+
+Mirror browser archives in a JFrog generic repository or another approved
+artifact service, preserving the URL layout expected by Playwright.
+
+[source,shell]
+----
+export PLAYWRIGHT_DOWNLOAD_HOST=https://jfrog.example/artifactory/playwright
+export PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers
+
+./gradlew :core:playwright --args="install chromium"
+----
+
+Per-browser overrides are also available:
+
+* `PLAYWRIGHT_CHROMIUM_DOWNLOAD_HOST`
+* `PLAYWRIGHT_FIREFOX_DOWNLOAD_HOST`
+* `PLAYWRIGHT_WEBKIT_DOWNLOAD_HOST`
+
+These take precedence over `PLAYWRIGHT_DOWNLOAD_HOST`.
+
+=== Transfer a preloaded browser cache
+
+On a connected staging machine with the same operating system and CPU
+architecture:
+
+[source,shell]
+----
+export PLAYWRIGHT_BROWSERS_PATH=/tmp/pw-browsers
+./gradlew :core:playwright --args="install chromium"
+tar -C /tmp -czf playwright-browsers.tgz pw-browsers
+----
+
+Scan and transfer the archive through the approved process. Extract it on the
+restricted machine and set the same location for every run:
+
+[source,shell]
+----
+export PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers
+./gradlew test
+----
+
+The cache is specific to the Playwright version, operating system, and
+architecture. Update it whenever Playwright changes.
+
+List the browsers known to the current Playwright version:
+
+[source,shell]
+----
+./gradlew :core:playwright --args="install --list"
+----
+
+== Prepare native browser dependencies
+
+`install --with-deps` downloads packages from operating-system repositories. It
+cannot succeed when the machine can reach only JFrog Maven.
+
+Ask workstation or base-image administrators to:
+
+. run the matching Playwright dependency installer in a connected environment
+  and capture the required packages;
+. approve and mirror those packages through the corporate OS repository, or
+  bake them into the workstation/container image;
+. include required fonts and certificate packages;
+. repeat validation when the base OS or Playwright version changes.
+
+When an approved apt mirror is configured:
+
+[source,shell]
+----
+./gradlew :core:playwright --args="install-deps chromium"
+----
+
+Local Chrome may already bring many dependencies, but the image still needs
+validation in headless and headed modes.
+
+== Certificates and proxies
+
+The relevant trust stores are separate:
+
+JVM and Gradle::
+Import the corporate root CA into the approved JDK trust store, or provide
+`javax.net.ssl.trustStore` through managed configuration.
+
+Browser::
+Install the corporate CA in the operating-system/browser trust store so HTTPS
+test targets load successfully.
+
+Bun and npm::
+Set `cafile` in `.npmrc` or `bunfig.toml` when building the example.
+
+Browser traffic::
+JVM proxy properties control Gradle downloads, not necessarily browser traffic.
+Managed Chrome can inherit corporate system proxy and enterprise policy.
+
+Do not disable TLS validation globally instead of installing the corporate CA.
+
+== Bun and the example UI
+
+Bun is required only for `example:ui`. Applications that merely consume Keb do
+not need Bun or Node.js.
+
+To build the example, prepare:
+
+* the approved Bun executable for each OS and architecture;
+* a JFrog npm virtual repository containing packages in
+  `example/ui/bun.lock`;
+* corporate npm credentials and CA configuration;
+* a warmed Bun cache or internal npm access for cold CI agents.
+
+Example `.npmrc`:
+
+[source,properties]
+----
+registry=https://jfrog.example/artifactory/api/npm/npm-virtual/
+always-auth=true
+cafile=/etc/company/corporate-ca.pem
+----
+
+Supply authentication through the organization's secret mechanism. Bun reads
+compatible `.npmrc` registry, scoped registry, authentication, cache, and CA
+settings.
+
+== Endpoint and CI controls
+
+Corporate policy must allow:
+
+* execution of the Playwright driver and its bundled Node runtime;
+* execution of the approved browser;
+* writes to browser caches, temporary directories, downloads, and
+  `build/keb-artifacts`;
+* loopback networking for local servers such as Vite preview;
+* process creation and cleanup by test workers;
+* browser access to the application under test.
+
+If the bundled Node runtime is prohibited, Playwright supports
+`PLAYWRIGHT_NODEJS_PATH` for an approved Node.js installation.
+
+Antivirus, application allow-listing, `noexec` mounts, browser policies, and
+container seccomp rules are common causes of launch failures even when every
+artifact is present.
+
+== Administrator checklist
+
+Verify these items on a clean restricted machine:
+
+* [ ] JDK 17+ is installed and trusts JFrog.
+* [ ] The Gradle distribution resolves without public internet.
+* [ ] Kotlin and Gradle plugins resolve through JFrog.
+* [ ] Keb, Playwright, and JUnit resolve through JFrog.
+* [ ] One approved browser strategy is documented and tested.
+* [ ] Native browser libraries and fonts are installed.
+* [ ] Corporate CA certificates are installed for Java and the browser.
+* [ ] Cache and temporary paths are writable and executable.
+* [ ] The browser can reach the application under test.
+* [ ] A cold CI runner succeeds without relying on a GitHub cache.
+* [ ] Bun and JFrog npm are available if the example is built.
+
+== Offline verification
+
+[source,shell]
+----
+./gradlew --version
+./gradlew dependencies
+./gradlew :core:playwright --args="install --list"
+./gradlew check
+----
+
+Then block public egress, clear disposable caches, and repeat from the
+documented internal sources. A successful warm-cache build alone does not prove
+that a new developer or runner can bootstrap.
+
+== Upstream references
+
+* https://playwright.dev/java/docs/browsers[Playwright browser installation,
+  enterprise channels, custom hosts, and browser paths]
+* https://playwright.dev/java/docs/api/class-browsertype[Playwright browser
+  channel and executable-path API]
+* https://docs.gradle.org/current/userguide/init_scripts.html[Gradle enterprise
+  initialization scripts]
+* https://docs.gradle.org/current/userguide/networking.html[Gradle networking
+  and proxy configuration]
+* https://bun.sh/docs/pm/npmrc[Bun `.npmrc` support]
