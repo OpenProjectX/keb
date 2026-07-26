@@ -1,0 +1,104 @@
+= Getting Started
+:toc:
+
+== Requirements
+
+* JDK 17 or newer
+* Kotlin/JVM
+* a supported Playwright browser
+* JUnit 5 when using `keb-junit5`
+
+== Dependencies
+
+Add the JUnit integration to the test configuration. It exposes `keb-core`
+transitively.
+
+[source,kotlin]
+----
+dependencies {
+    testImplementation("org.openprojectx.test.keb:keb-junit5:<version>")
+}
+----
+
+For scripts or another test framework, depend directly on the core module:
+
+[source,kotlin]
+----
+dependencies {
+    implementation("org.openprojectx.test.keb:keb-core:<version>")
+}
+----
+
+== Install a browser
+
+This repository exposes Playwright's CLI through Gradle:
+
+[source,shell]
+----
+./gradlew :core:playwright --args="install chromium"
+----
+
+CI can install Chromium and its operating-system dependencies:
+
+[source,shell]
+----
+./gradlew :core:playwright --args="install --with-deps chromium"
+----
+
+== First page
+
+[source,kotlin]
+----
+class LoginPage(keb: KebSession) : KebPage(keb, "/login") {
+    val username by content { label("Username") }
+    val password by content { label("Password") }
+    val signIn by content { role(AriaRole.BUTTON, "Sign in") }
+
+    private val title by content { heading("Sign in") }
+
+    override fun at() = verify {
+        title.isVisible()
+        url endsWith "/login"
+    }
+}
+----
+
+Content definitions return native Playwright locators. A cached locator remains
+safe across DOM updates because Playwright resolves its target again for each
+action.
+
+== First test
+
+[source,kotlin]
+----
+@KebTest(baseUrl = "https://example.test")
+class LoginTest {
+    @Test
+    fun `user can sign in`(keb: KebSession) = keb {
+        val login = to<LoginPage>()
+
+        login.username setTo "alice"
+        login.password setTo "secret"
+        login.signIn.click()
+
+        Unit
+    }
+}
+----
+
+The extension creates and closes the browser, context, page, and session. Each
+test gets a fresh context and page.
+
+== Without JUnit
+
+[source,kotlin]
+----
+drive(
+    KebConfig(baseUrl = URI("https://example.test")),
+) {
+    val login = to<LoginPage>()
+    login.username setTo "alice"
+}
+----
+
+`drive` owns and closes the complete browser lifecycle.

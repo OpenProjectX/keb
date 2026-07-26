@@ -1,0 +1,71 @@
+= Releasing
+:toc:
+
+The GitHub Actions workflow is defined in
+`../.github/workflows/release.yml`.
+
+== Triggers
+
+The workflow runs:
+
+* on pushes to `master`;
+* through manual `workflow_dispatch`.
+
+Commits created by the Gradle Release Plugin and common CI-skip messages do not
+start another release.
+
+Manual runs can provide extra Gradle arguments, select a log level, or skip
+verification.
+
+== Verification
+
+Before publishing, the workflow:
+
+. installs JDK 17 and configures Gradle;
+. installs and caches Bun;
+. restores Bun's package cache;
+. restores the Playwright Chromium cache;
+. installs Chromium and required operating-system packages on a cache miss;
+. runs the root checks;
+. publishes artifacts to the example Maven repository;
+. builds and tests the independent example.
+
+== Secrets
+
+Configure these repository or organization secrets:
+
+[cols="1,3"]
+|===
+|Secret |Purpose
+
+|`OSSRH_USERNAME`
+|Sonatype publishing username
+
+|`OSSRH_PASSWORD`
+|Sonatype publishing password or token
+
+|`SIGNING_KEY_ASC`
+|ASCII-armored OpenPGP private key
+
+|`SIGNING_KEY_PASSWORD`
+|Private-key passphrase
+
+|`RELEASE_GITHUB_TOKEN`
+|Optional token when the default workflow token cannot push release commits and
+tags through branch protection
+|===
+
+== Published artifacts
+
+[source,text]
+----
+org.openprojectx.test.keb:keb-core:<version>
+org.openprojectx.test.keb:keb-junit5:<version>
+----
+
+The Gradle Release Plugin removes the `-SNAPSHOT` suffix, creates the release
+commit and tag, runs the configured Sonatype tasks, and advances the repository
+to the next snapshot version.
+
+If the workflow fails, test reports, build reports, and Keb failure artifacts
+are uploaded for diagnosis.

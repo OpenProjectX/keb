@@ -1,0 +1,51 @@
+= Keb Documentation
+:toc:
+:toclevels: 2
+
+Keb is a Kotlin browser automation DSL inspired by Geb and implemented on top
+of Playwright for Java.
+
+== Design
+
+Keb keeps the most useful ideas from Geb:
+
+* pages describe destinations and identity checks;
+* modules describe reusable page fragments;
+* content is declared lazily;
+* navigation returns typed pages;
+* waiting and diagnostics are part of the testing model.
+
+Keb adapts those ideas to Kotlin and Playwright:
+
+* Playwright `Locator` is the element abstraction;
+* pages are explicit types rather than a dynamically delegated current page;
+* actions use Playwright actionability checks;
+* verification uses Playwright retrying assertions;
+* each JUnit test receives an isolated browser context.
+
+Keb does not wrap every Playwright method. Native `Page`, `BrowserContext`, and
+`Locator` objects remain available for advanced use cases.
+
+== Modules
+
+`keb-core`::
+Browser configuration, browser and context lifecycle, sessions, pages, modules,
+content delegates, interactions, and verification.
+
+`keb-junit5`::
+The `@KebTest` extension, test-scoped `KebSession` injection, and failure
+screenshots.
+
+== Guides
+
+* link:getting-started.adoc[Getting started]
+* link:dsl.adoc[Pages, modules, and the Kotlin DSL]
+* link:configuration.adoc[Configuration and runtime properties]
+* link:example.adoc[Independent React and Material UI example]
+* link:releasing.adoc[Release process]
+
+== MVP scope
+
+The public DSL is compiled Kotlin in `.kt` files. Runtime `.kts` scenario
+loading is outside the current MVP. This keeps standard compilation, IDE
+completion, navigation, refactoring, and test discovery.

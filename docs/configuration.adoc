@@ -1,0 +1,117 @@
+= Configuration
+:toc:
+
+== Programmatic configuration
+
+[source,kotlin]
+----
+val config = KebConfig(
+    baseUrl = URI("https://example.test"),
+    browser = KebBrowserName.CHROMIUM,
+    headless = true,
+    slowMotion = 250.milliseconds,
+    actionTimeout = 10.seconds,
+    navigationTimeout = 30.seconds,
+    artifactsDirectory = Path.of("build/keb-artifacts"),
+)
+----
+
+`KebBrowser.launch(config)` creates a reusable browser owner.
+`browser.newSession()` creates an isolated context and page.
+
+== JUnit annotation
+
+[source,kotlin]
+----
+@KebTest(
+    baseUrl = "https://example.test",
+    browser = KebBrowserName.CHROMIUM,
+    headless = true,
+)
+class BrowserTest
+----
+
+== Runtime properties
+
+JVM system properties override annotation or programmatic defaults.
+
+[cols="1,2"]
+|===
+|Property |Example
+
+|`keb.baseUrl`
+|`http://127.0.0.1:4173`
+
+|`keb.browser`
+|`chromium`, `firefox`, or `webkit`
+
+|`keb.headless`
+|`true` or `false`
+
+|`keb.slowMoMillis`
+|`250`
+
+|`keb.actionTimeoutMillis`
+|`10000`
+
+|`keb.navigationTimeoutMillis`
+|`30000`
+
+|`keb.artifactsDirectory`
+|`build/keb-artifacts`
+|===
+
+Apply properties explicitly outside JUnit:
+
+[source,kotlin]
+----
+val config = KebConfig.fromSystemProperties(
+    KebConfig(baseUrl = URI("https://example.test")),
+)
+----
+
+Invalid booleans, browser names, durations, and timeouts fail early with the
+property name in the error.
+
+== Gradle
+
+Properties must reach the forked test JVM. The independent example forwards
+both JVM and Gradle project properties, so either form works:
+
+[source,shell]
+----
+./gradlew -p example :testing:test -Dkeb.headless=false
+./gradlew -p example :testing:test -Pkeb.headless=false
+----
+
+Run a visible browser slowly enough to follow:
+
+[source,shell]
+----
+./gradlew -p example :testing:test \
+  -Dkeb.headless=false \
+  -Dkeb.slowMoMillis=250
+----
+
+Consumer Gradle builds can forward the same values:
+
+[source,kotlin]
+----
+tasks.test {
+    val headless = providers.gradleProperty("keb.headless")
+        .orElse(providers.systemProperty("keb.headless"))
+    headless.orNull?.let { systemProperty("keb.headless", it) }
+}
+----
+
+== Failure artifacts
+
+The JUnit extension attempts to capture a full-page screenshot when a test
+fails. The default directory is `build/keb-artifacts` and can be changed through
+configuration or `keb.artifactsDirectory`.
+
+== Threading
+
+Playwright Java objects are not shared between arbitrary threads. A
+`KebSession`, its context, and its page belong to one test execution. The JUnit
+extension favors isolation and creates a fresh session for every test.

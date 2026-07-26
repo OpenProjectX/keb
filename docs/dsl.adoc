@@ -1,0 +1,172 @@
+= Pages, Modules, and the Kotlin DSL
+:toc:
+
+== Pages
+
+A page defines an optional navigation path, content, behavior, and an identity
+check.
+
+[source,kotlin]
+----
+class DashboardPage(keb: KebSession) : KebPage(keb, "/dashboard") {
+    val welcome by content { testId("welcome") }
+
+    override fun at() = verify {
+        welcome.isVisible()
+        url endsWith "/dashboard"
+    }
+}
+----
+
+Navigate and verify a page:
+
+[source,kotlin]
+----
+val dashboard = keb.to<DashboardPage>()
+val current = keb.at<DashboardPage>()
+----
+
+`to` navigates to the configured path and then verifies the destination. `at`
+only constructs and verifies a page against the current browser state.
+
+Both operations also accept constructor references:
+
+[source,kotlin]
+----
+val dashboard = keb.to(::DashboardPage)
+----
+
+== Content
+
+Content uses Kotlin property delegates:
+
+[source,kotlin]
+----
+val save by content {
+    role(AriaRole.BUTTON, "Save")
+}
+----
+
+Available locator helpers include:
+
+* `role`
+* `label`
+* `text`
+* `heading`
+* `placeholder`
+* `testId`
+* `css`
+
+Prefer roles, labels, visible text, and explicit test IDs over selectors coupled
+to DOM structure.
+
+The delegated value is a Playwright `Locator`. Native locator methods are
+available without an escape API.
+
+== Modules
+
+Modules represent reusable components scoped beneath a root locator.
+
+[source,kotlin]
+----
+class LoginForm(
+    keb: KebSession,
+    root: Locator,
+) : KebModule(keb, root) {
+    val username by content { label("Username") }
+    val password by content { label("Password") }
+    val submit by content { role(AriaRole.BUTTON, "Sign in") }
+
+    fun loginAs(user: String, secret: String): DashboardPage {
+        username setTo user
+        password setTo secret
+        submit.click()
+        return keb.at()
+    }
+}
+----
+
+Attach a module to a page:
+
+[source,kotlin]
+----
+class LoginPage(keb: KebSession) : KebPage(keb, "/login") {
+    val form by module(::LoginForm) {
+        testId("login-form")
+    }
+
+    override fun at() = verify {
+        heading("Sign in").isVisible()
+    }
+}
+----
+
+A module's locator helpers search below its root. Portaled UI such as a global
+menu or dialog can still be located from `keb.page`.
+
+== Interactions
+
+Keb provides a few readable extensions while preserving native Playwright
+methods:
+
+[source,kotlin]
+----
+username setTo "alice"
+country select "China"
+search pressKey "Enter"
+rememberMe.check()
+submit.click()
+----
+
+The DSL intentionally avoids building sentence-like chains that obscure
+behavior or reduce IDE discoverability.
+
+== Verification
+
+Verification uses Playwright's retrying assertion API:
+
+[source,kotlin]
+----
+dashboard.verify {
+    dashboard.welcome hasText "Welcome, Alice"
+    dashboard.save.isEnabled()
+    url endsWith "/dashboard"
+}
+----
+
+Supported locator assertions include:
+
+* `isVisible`
+* `isHidden`
+* `isEnabled`
+* `isChecked`
+* `hasText`
+* `containsText`
+
+URL assertions support:
+
+* `url endsWith "/dashboard"`
+* `url isExactly "https://example.test/dashboard"`
+* `url matches Regex(...)`
+
+Keb does not apply another implicit polling layer around locator actions.
+Playwright handles actionability and retrying assertions.
+
+== Session access
+
+`KebSession` exposes the underlying objects:
+
+[source,kotlin]
+----
+keb.page
+keb.context
+keb.config
+----
+
+It also provides browser navigation:
+
+[source,kotlin]
+----
+keb.back()
+keb.refresh()
+----

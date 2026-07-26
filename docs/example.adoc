@@ -1,0 +1,79 @@
+= Independent Example
+:toc:
+
+The `example` directory is a standalone Gradle build. It does not include Keb
+source projects and does not use a composite build.
+
+[source,text]
+----
+example
+├── ui        Bun + Vite + React + Material UI
+└── testing   Kotlin + JUnit 5 + published Keb artifacts
+----
+
+The testing module resolves:
+
+[source,text]
+----
+org.openprojectx.test.keb:keb-core:0.1.0-SNAPSHOT
+org.openprojectx.test.keb:keb-junit5:0.1.0-SNAPSHOT
+----
+
+from the repository-local Maven directory at `build/example-maven`.
+
+== Run the complete example
+
+From the repository root:
+
+[source,shell]
+----
+./gradlew publishExampleArtifacts
+./gradlew -p example check
+----
+
+The workflow:
+
+. publishes the current Keb modules locally;
+. runs `bun install --frozen-lockfile`;
+. type-checks and builds the Vite application;
+. starts `vite preview`;
+. runs the Keb/JUnit journeys in Chromium;
+. stops the preview server.
+
+Snapshot dependency caching is disabled in the consumer build so a republished
+artifact is picked up immediately.
+
+== UI development
+
+[source,shell]
+----
+./gradlew -p example :ui:bunDev
+----
+
+The UI is served at `http://127.0.0.1:4173`.
+
+Bun uses the calling environment's `.npmrc` or `bunfig.toml`. The example does
+not override the npm registry and commits `bun.lock` for repeatable installs.
+
+== UI coverage
+
+The Material UI application includes:
+
+* application bar, drawer, breadcrumbs, avatars, badges, lists, and tooltips;
+* text, email, password, date, select, autocomplete, radio, checkbox, switch,
+  and slider inputs;
+* buttons, icon buttons, floating action buttons, links, menus, and pagination;
+* cards, chips, alerts, snackbars, dialogs, progress indicators, and skeletons;
+* tabs, accordions, tables, ratings, responsive layout, and theme switching.
+
+The tests model the profile form, component playground, and team table as Keb
+modules. Locators primarily use accessible roles, labels, and visible names.
+
+== Headed mode
+
+[source,shell]
+----
+./gradlew -p example :testing:test \
+  -Dkeb.headless=false \
+  -Dkeb.slowMoMillis=250
+----
