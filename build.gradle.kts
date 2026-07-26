@@ -126,6 +126,10 @@ nexusPublishing {
         sonatype {
             nexusUrl.set(uri("https://ossrh-staging-api.central.sonatype.com/service/local/"))
             snapshotRepositoryUrl.set(uri("https://central.sonatype.com/repository/maven-snapshots/"))
+            // The compatibility API's profile discovery is unreliable after
+            // namespace migration. This is the profile ID returned by the
+            // successful 0.1.1 release.
+            stagingProfileId.set("org.openprojectx")
             username.set(System.getenv("OSSRH_USERNAME"))
             password.set(System.getenv("OSSRH_PASSWORD"))
 

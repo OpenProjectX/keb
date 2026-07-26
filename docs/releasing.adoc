@@ -74,5 +74,9 @@ workflow also checks Maven Central: if both artifacts already exist, it skips
 the immutable upload and recovers only the Git release commit, tag, and next
 snapshot version.
 
+The Sonatype staging profile ID is pinned to `org.openprojectx`. The
+compatibility service does not consistently return migrated namespaces from
+its legacy profile-discovery endpoint.
+
 If the workflow fails, test reports, build reports, and Keb failure artifacts
 are uploaded for diagnosis.
