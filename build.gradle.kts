@@ -1,4 +1,11 @@
+import io.github.gradlenexus.publishplugin.CloseNexusStagingRepository
 import net.researchgate.release.ReleaseExtension
+import java.net.URI
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
+import java.nio.charset.StandardCharsets
+import java.util.Base64
 
 plugins {
     `maven-publish`
@@ -126,8 +133,68 @@ nexusPublishing {
     }
 }
 
+val closeSonatypeStagingRepository =
+    tasks.named<CloseNexusStagingRepository>("closeSonatypeStagingRepository")
+
+tasks.register("requestSonatypeStagingRepositoryRelease") {
+    group = "publishing"
+    description = "Requests asynchronous release without polling the OSSRH compatibility status"
+    dependsOn(closeSonatypeStagingRepository)
+
+    doLast {
+        val closeTask = closeSonatypeStagingRepository.get()
+        val repository = closeTask.repository.get()
+        val repositoryId = closeTask.stagingRepositoryId.get()
+        val username = repository.username.orNull
+            ?: throw GradleException("OSSRH_USERNAME is not configured")
+        val password = repository.password.orNull
+            ?: throw GradleException("OSSRH_PASSWORD is not configured")
+        val credentials = Base64.getEncoder().encodeToString(
+            "$username:$password".toByteArray(StandardCharsets.UTF_8),
+        )
+        val description = closeTask.repositoryDescription.get()
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+        val requestBody =
+            """{"data":{"stagedRepositoryIds":["$repositoryId"],"description":"$description","autoDropAfterRelease":true}}"""
+        val request = HttpRequest.newBuilder()
+            .uri(URI.create("${repository.nexusUrl.get()}staging/bulk/promote"))
+            .header("Authorization", "Basic $credentials")
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+            .build()
+        val response = HttpClient.newHttpClient().send(
+            request,
+            HttpResponse.BodyHandlers.ofString(),
+        )
+
+        if (response.statusCode() !in 200..299) {
+            throw GradleException(
+                "Sonatype release request failed with HTTP ${response.statusCode()}: ${response.body()}",
+            )
+        }
+        logger.lifecycle(
+            "Sonatype accepted the asynchronous release request for staging repository '{}'",
+            repositoryId,
+        )
+    }
+}
+
 configure<ReleaseExtension> {
-    buildTasks.set(listOf("publishToSonatype", "closeAndReleaseSonatypeStagingRepository"))
+    val skipPublish = providers.gradleProperty("keb.release.skipPublish")
+        .map(String::toBoolean)
+        .getOrElse(false)
+    buildTasks.set(
+        if (skipPublish) {
+            emptyList()
+        } else {
+            listOf(
+                "publishToSonatype",
+                "closeSonatypeStagingRepository",
+                "requestSonatypeStagingRepositoryRelease",
+            )
+        },
+    )
     versionPropertyFile.set("gradle.properties")
     tagTemplate.set("\$name-\$version")
 

@@ -67,5 +67,12 @@ The Gradle Release Plugin removes the `-SNAPSHOT` suffix, creates the release
 commit and tag, runs the configured Sonatype tasks, and advances the repository
 to the next snapshot version.
 
+Sonatype's OSSRH compatibility service transfers a closed repository to the
+Central Publisher Portal asynchronously. Keb sends the promote request without
+polling the compatibility repository for a final state. Before a release, the
+workflow also checks Maven Central: if both artifacts already exist, it skips
+the immutable upload and recovers only the Git release commit, tag, and next
+snapshot version.
+
 If the workflow fails, test reports, build reports, and Keb failure artifacts
 are uploaded for diagnosis.

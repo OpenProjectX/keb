@@ -151,6 +151,18 @@ jobs:
           fi
           release_version="${release_version%-SNAPSHOT}"
           echo "RELEASE_VERSION=${release_version}" >> "$GITHUB_ENV"
+          release_already_published=true
+          for artifact in keb-core keb-junit5; do
+            artifact_url="https://repo.maven.apache.org/maven2/org/openprojectx/test/keb/${artifact}/${release_version}/${artifact}-${release_version}.pom"
+            if ! curl --fail --silent --show-error --location \
+              --output /dev/null "$artifact_url"; then
+              release_already_published=false
+            fi
+          done
+          echo "RELEASE_ALREADY_PUBLISHED=${release_already_published}" >> "$GITHUB_ENV"
+          if [ "$release_already_published" = "true" ]; then
+            echo "::notice::Version ${release_version} is already on Maven Central; publication will be skipped and Git release metadata will be recovered."
+          fi
 
       - name: Run release
         id: run_release
@@ -165,9 +177,13 @@ jobs:
           if [ "$SKIP_TESTS" = "true" ]; then
             skip_test_args=(-x test)
           fi
+          publish_args=()
+          if [ "$RELEASE_ALREADY_PUBLISHED" = "true" ]; then
+            publish_args=(-Pkeb.release.skipPublish=true)
+          fi
           ./gradlew --no-configuration-cache release \
             --stacktrace "--$GRADLE_LOG_LEVEL" \
-            "${skip_test_args[@]}" $EXTRA_GRADLE_ARGS
+            "${skip_test_args[@]}" "${publish_args[@]}" $EXTRA_GRADLE_ARGS
 
       - name: Upload diagnostics
         if: failure()
