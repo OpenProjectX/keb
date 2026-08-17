@@ -65,7 +65,7 @@ back to the host artifact directory.
 == Remote browser in Docker
 
 The example can run the same journeys from the host JVM against a Playwright
-server in `mcr.microsoft.com/playwright:v1.62.1`:
+server in `ghcr.io/openprojectx/mcr/playwright:v1.62.1`:
 
 [source,shell]
 ----

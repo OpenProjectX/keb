@@ -153,7 +153,7 @@ Then replace `:core:playwright` with `playwright` in installation commands.
 === Remote browser service
 
 A browser pod removes browser binaries and native libraries from the test
-runner. Mirror `mcr.microsoft.com/playwright:v1.62.1` into the internal
+runner. Mirror `ghcr.io/openprojectx/mcr/playwright:v1.62.1` into the internal
 container registry and bake `playwright@1.62.1` into the image from the JFrog
 npm repository; do not depend on `npx` reaching the public registry at pod
 startup.

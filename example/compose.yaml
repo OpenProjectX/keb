@@ -1,6 +1,6 @@
 services:
   playwright:
-    image: mcr.microsoft.com/playwright:v1.62.1
+    image: ghcr.io/openprojectx/mcr/playwright:v1.62.1
     init: true
     user: pwuser
     working_dir: /home/pwuser
