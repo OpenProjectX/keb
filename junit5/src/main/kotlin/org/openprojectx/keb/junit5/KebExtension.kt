@@ -10,7 +10,11 @@ import org.openprojectx.keb.KebBrowser
 import org.openprojectx.keb.KebConfig
 import org.openprojectx.keb.KebSession
 import java.net.URI
+import java.nio.charset.StandardCharsets
 import java.nio.file.Files
+import java.nio.file.Path
+import java.security.MessageDigest
+import java.util.ServiceLoader
 
 public class KebExtension :
     BeforeEachCallback,
@@ -24,13 +28,32 @@ public class KebExtension :
                 baseUrl = annotation.baseUrl.takeIf(String::isNotBlank)?.let(URI::create),
                 browser = annotation.browser,
                 headless = annotation.headless,
+                videoMode = annotation.video,
             ),
         )
         val browser = KebBrowser.launch(config)
 
         try {
-            store(context).put(STATE_KEY, State(browser, browser.newSession()))
+            val session = browser.newSession()
+            val reportContext = KebTestReportContext(
+                id = context.uniqueId,
+                displayName = context.displayName,
+                testClass = context.requiredTestClass,
+                testMethod = context.testMethod.orElse(null),
+                session = session,
+                artifactDirectory = artifactDirectory(context, config.artifactsDirectory),
+            )
+            store(context).put(
+                STATE_KEY,
+                State(
+                    browser = browser,
+                    session = session,
+                    report = reportContext,
+                ),
+            )
+            reporters.forEach { it.testStarted(reportContext) }
         } catch (error: Throwable) {
+            store(context).remove(STATE_KEY)
             browser.close()
             throw error
         }
@@ -40,14 +63,41 @@ public class KebExtension :
         val state = store(context).remove(STATE_KEY, State::class.java) ?: return
         val failure = context.executionException.orElse(null)
 
-        try {
-            if (failure != null) captureFailure(context, state.session)
-        } finally {
+        if (failure != null) captureFailure(state)
+
+        var cleanupFailure: Throwable? = null
+        fun cleanup(action: () -> Unit) {
             try {
-                state.session.close()
-            } finally {
-                state.browser.close()
+                action()
+            } catch (error: Throwable) {
+                cleanupFailure?.addSuppressed(error) ?: run { cleanupFailure = error }
             }
+        }
+        reporters.forEach { reporter ->
+            cleanup { reporter.beforeSessionClose(state.report, failure) }
+        }
+        cleanup {
+            state.session.finish(
+                failed = failure != null,
+                artifactDirectory = state.report.artifactDirectory,
+            ).forEachIndexed { index, path ->
+                state.report.addArtifact(
+                    KebTestArtifact(
+                        name = "Session video ${index + 1}",
+                        mediaType = "video/webm",
+                        extension = "webm",
+                        path = path,
+                    ),
+                )
+            }
+        }
+        cleanup(state.browser::close)
+        reporters.forEach { reporter ->
+            cleanup { reporter.testFinished(state.report, failure) }
+        }
+
+        cleanupFailure?.let { error ->
+            if (failure != null) failure.addSuppressed(error) else throw error
         }
     }
 
@@ -61,21 +111,38 @@ public class KebExtension :
         extensionContext: ExtensionContext,
     ): Any = requireState(extensionContext).session
 
-    private fun captureFailure(context: ExtensionContext, session: KebSession) {
-        val directory = session.config.artifactsDirectory
-        Files.createDirectories(directory)
+    private fun captureFailure(state: State) {
+        runCatching {
+            Files.createDirectories(state.report.artifactDirectory)
+            val path = state.report.artifactDirectory.resolve("failure.png")
+            state.session.page.screenshot(
+                Page.ScreenshotOptions()
+                    .setPath(path)
+                    .setFullPage(true),
+            )
+            state.report.addArtifact(
+                KebTestArtifact(
+                    name = "Failure screenshot",
+                    mediaType = "image/png",
+                    extension = "png",
+                    path = path,
+                ),
+            )
+        }
+    }
+
+    private fun artifactDirectory(context: ExtensionContext, root: Path): Path {
         val name = context.displayName
             .replace(Regex("""[^a-zA-Z0-9._-]+"""), "-")
             .trim('-')
-            .ifBlank { "failed-test" }
-
-        runCatching {
-            session.page.screenshot(
-                Page.ScreenshotOptions()
-                    .setPath(directory.resolve("$name.png"))
-                    .setFullPage(true),
-            )
-        }
+            .ifBlank { "test" }
+            .take(100)
+            .trimEnd('-', '.')
+        val digest = MessageDigest.getInstance("SHA-256")
+            .digest(context.uniqueId.toByteArray(StandardCharsets.UTF_8))
+            .take(4)
+            .joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
+        return root.resolve("$name-$digest")
     }
 
     private fun requireState(context: ExtensionContext): State =
@@ -91,9 +158,17 @@ public class KebExtension :
     private data class State(
         val browser: KebBrowser,
         val session: KebSession,
+        val report: KebTestReportContext,
     )
 
     private companion object {
         const val STATE_KEY = "keb-state"
+
+        val reporters: List<KebTestReporter> by lazy {
+            ServiceLoader.load(
+                KebTestReporter::class.java,
+                Thread.currentThread().contextClassLoader,
+            ).toList()
+        }
     }
 }

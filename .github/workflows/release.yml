@@ -152,7 +152,7 @@ jobs:
           release_version="${release_version%-SNAPSHOT}"
           echo "RELEASE_VERSION=${release_version}" >> "$GITHUB_ENV"
           release_already_published=true
-          for artifact in keb-core keb-junit5; do
+          for artifact in keb-core keb-junit5 keb-allure; do
             artifact_url="https://repo.maven.apache.org/maven2/org/openprojectx/test/keb/${artifact}/${release_version}/${artifact}-${release_version}.pom"
             if ! curl --fail --silent --show-error --location \
               --output /dev/null "$artifact_url"; then
@@ -207,6 +207,7 @@ jobs:
           artifacts=(
             "keb-core"
             "keb-junit5"
+            "keb-allure"
           )
 
           {

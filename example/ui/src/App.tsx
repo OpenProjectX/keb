@@ -17,6 +17,7 @@ import {
   Checkbox,
   Chip,
   CircularProgress,
+  Collapse,
   Container,
   CssBaseline,
   Dialog,
@@ -38,6 +39,8 @@ import {
   List,
   ListItem,
   ListItemAvatar,
+  ListItemButton,
+  ListItemIcon,
   ListItemText,
   Menu,
   MenuItem,
@@ -70,11 +73,14 @@ import {
 import {
   Add,
   Analytics,
+  AccountTree,
   CheckCircle,
+  ChevronRight,
   Close,
   CloudDone,
   Code,
   DarkMode,
+  ExpandLess,
   ExpandMore,
   HelpOutlined,
   LightMode,
@@ -105,6 +111,9 @@ function App() {
   const [savedName, setSavedName] = useState("");
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const [department, setDepartment] = useState("engineering");
+  const [customerExperienceOpen, setCustomerExperienceOpen] = useState(false);
+  const [digitalCommerceOpen, setDigitalCommerceOpen] = useState(false);
+  const [selectedNavigation, setSelectedNavigation] = useState<string | null>(null);
 
   const theme = createTheme({
     palette: {
@@ -181,18 +190,62 @@ function App() {
             </IconButton>
           </Stack>
           <Divider />
-          <List>
-            {[
-              ["Dashboard", <Analytics />],
-              ["Team", <People />],
-              ["Components", <Code />],
-              ["Settings", <Settings />],
-            ].map(([label, icon]) => (
-              <ListItem key={label as string}>
-                <ListItemAvatar><Avatar>{icon}</Avatar></ListItemAvatar>
-                <ListItemText primary={label as string} secondary="Example destination" />
-              </ListItem>
-            ))}
+          <List aria-label="Workspace hierarchy">
+            <ListItemButton aria-label="Dashboard">
+              <ListItemIcon><Analytics /></ListItemIcon>
+              <ListItemText primary="Dashboard" secondary="Quality overview" />
+            </ListItemButton>
+            <ListItemButton
+              aria-label="Customer experience"
+              aria-expanded={customerExperienceOpen}
+              onClick={() => setCustomerExperienceOpen((value) => !value)}
+            >
+              <ListItemIcon><People /></ListItemIcon>
+              <ListItemText primary="Customer experience" secondary="Business domain" />
+              {customerExperienceOpen ? <ExpandLess /> : <ExpandMore />}
+            </ListItemButton>
+            <Collapse in={customerExperienceOpen} timeout="auto" unmountOnExit>
+              <List component="div" disablePadding>
+                <ListItemButton
+                  aria-label="Digital commerce"
+                  aria-expanded={digitalCommerceOpen}
+                  sx={{ pl: 4 }}
+                  onClick={() => setDigitalCommerceOpen((value) => !value)}
+                >
+                  <ListItemIcon><AccountTree /></ListItemIcon>
+                  <ListItemText primary="Digital commerce" secondary="Customer journey" />
+                  {digitalCommerceOpen ? <ExpandLess /> : <ChevronRight />}
+                </ListItemButton>
+                <Collapse in={digitalCommerceOpen} timeout="auto" unmountOnExit>
+                  <List component="div" disablePadding>
+                    <ListItemButton
+                      aria-label="Checkout operations"
+                      selected={selectedNavigation === "Checkout operations"}
+                      sx={{ pl: 8 }}
+                      onClick={() => {
+                        setSelectedNavigation("Checkout operations");
+                        setDrawerOpen(false);
+                      }}
+                    >
+                      <ListItemIcon><ChevronRight /></ListItemIcon>
+                      <ListItemText primary="Checkout operations" secondary="Operational workspace" />
+                    </ListItemButton>
+                    <ListItemButton aria-label="Order history" sx={{ pl: 8 }}>
+                      <ListItemIcon><ChevronRight /></ListItemIcon>
+                      <ListItemText primary="Order history" secondary="Customer records" />
+                    </ListItemButton>
+                  </List>
+                </Collapse>
+              </List>
+            </Collapse>
+            <ListItemButton aria-label="Components">
+              <ListItemIcon><Code /></ListItemIcon>
+              <ListItemText primary="Components" secondary="UI inventory" />
+            </ListItemButton>
+            <ListItemButton aria-label="Settings">
+              <ListItemIcon><Settings /></ListItemIcon>
+              <ListItemText primary="Settings" secondary="Workspace preferences" />
+            </ListItemButton>
           </List>
         </Box>
       </Drawer>
@@ -231,6 +284,26 @@ function App() {
             </Button>
           </Stack>
         </Paper>
+
+        {selectedNavigation && (
+          <Paper
+            component="section"
+            data-testid="navigation-destination"
+            aria-label="Selected workspace"
+            sx={{ mt: 3, p: 3, borderLeft: 5, borderColor: "secondary.main" }}
+          >
+            <Stack direction={{ xs: "column", md: "row" }} sx={{ justifyContent: "space-between", gap: 2 }}>
+              <Box>
+                <Typography color="text.secondary" variant="overline">Selected business workspace</Typography>
+                <Typography variant="h2" sx={{ fontSize: "1.7rem" }}>{selectedNavigation}</Typography>
+                <Typography color="text.secondary" data-testid="navigation-path" sx={{ mt: 1 }}>
+                  Customer experience / Digital commerce / {selectedNavigation}
+                </Typography>
+              </Box>
+              <Chip label="3-level navigation" color="secondary" variant="outlined" />
+            </Stack>
+          </Paper>
+        )}
 
         <Box
           sx={{

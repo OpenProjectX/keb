@@ -12,6 +12,10 @@ public class KebBrowser private constructor(
     public fun newSession(): KebSession {
         val contextOptions = Browser.NewContextOptions()
         config.baseUrl?.let { contextOptions.setBaseURL(it.toString()) }
+        if (config.videoMode != KebVideoMode.OFF) {
+            contextOptions.setRecordVideoDir(config.videoStagingDirectory)
+            config.videoSize?.let { contextOptions.setRecordVideoSize(it.width, it.height) }
+        }
 
         val context = browser.newContext(contextOptions)
         context.setDefaultTimeout(config.actionTimeout.inWholeMilliseconds.toDouble())

@@ -36,11 +36,16 @@ content delegates, interactions, and verification.
 The `@KebTest` extension, test-scoped `KebSession` injection, and failure
 screenshots.
 
+`keb-allure`::
+Optional business-readable BDD journeys, contextual screenshots, failure
+diagnostics, traces, videos, and Allure metadata.
+
 == Guides
 
 * link:getting-started.adoc[Getting started]
 * link:dsl.adoc[Pages, modules, and the Kotlin DSL]
 * link:configuration.adoc[Configuration and runtime properties]
+* link:reporting.adoc[Business-readable Allure reporting]
 * link:corporate-network.adoc[Restricted corporate network setup]
 * link:example.adoc[Independent React and Material UI example]
 * link:releasing.adoc[Release process]

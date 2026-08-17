@@ -6,7 +6,18 @@ public fun <T> drive(
     config: KebConfig = KebConfig(),
     block: KebSession.() -> T,
 ): T = KebBrowser.launch(config).use { browser ->
-    browser.newSession().use { session ->
+    val session = browser.newSession()
+    var failure: Throwable? = null
+    try {
         session.block()
+    } catch (error: Throwable) {
+        failure = error
+        throw error
+    } finally {
+        try {
+            session.close(failed = failure != null)
+        } catch (closeError: Throwable) {
+            failure?.addSuppressed(closeError) ?: throw closeError
+        }
     }
 }

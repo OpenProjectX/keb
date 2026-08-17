@@ -1,5 +1,6 @@
 plugins {
     kotlin("jvm") version "2.2.21"
+    id("io.qameta.allure-report") version "4.1.0"
 }
 
 val kebVersion: String by project
@@ -15,23 +16,53 @@ val kebPropertyNames = listOf(
     "keb.actionTimeoutMillis",
     "keb.navigationTimeoutMillis",
     "keb.artifactsDirectory",
+    "keb.video",
+    "keb.videoWidth",
+    "keb.videoHeight",
+    "keb.videoStagingDirectory",
 )
 
 kotlin {
     jvmToolchain(17)
 }
 
+// The Allure report plugin adds a project repository for its runtime. Repeat
+// the consumer repositories here so Gradle still resolves the test classpath.
+repositories {
+    maven {
+        name = "kebLocal"
+        url = uri(rootProject.file("../build/example-maven"))
+        content {
+            includeGroup("org.openprojectx.test.keb")
+        }
+    }
+    mavenCentral()
+}
+
 dependencies {
     testImplementation("org.openprojectx.test.keb:keb-core:$kebVersion")
     testImplementation("org.openprojectx.test.keb:keb-junit5:$kebVersion")
+    testImplementation("org.openprojectx.test.keb:keb-allure:$kebVersion")
     testImplementation(platform("org.junit:junit-bom:5.13.4"))
     testImplementation("org.junit.jupiter:junit-jupiter-api")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    testRuntimeOnly("org.slf4j:slf4j-simple:2.0.17")
+
+    // keb-allure owns result collection; the Gradle plugin only renders it.
+    add("allureReport", files(layout.buildDirectory.dir("allure-results")))
 }
 
 configurations.configureEach {
     resolutionStrategy.cacheChangingModulesFor(0, "seconds")
+}
+
+tasks.withType<Test>().configureEach {
+    systemProperty(
+        "allure.results.directory",
+        layout.buildDirectory.dir("allure-results").get().asFile.absolutePath,
+    )
+    systemProperty("allure.results.clean.before.run", "true")
 }
 
 tasks.test {
@@ -50,6 +81,12 @@ tasks.test {
     testLogging {
         events("passed", "skipped", "failed")
     }
+}
+
+tasks.named("allureReport") {
+    group = "verification"
+    description = "Runs the UI tests and generates the Allure HTML report"
+    dependsOn(tasks.test)
 }
 
 val remoteBrowserUp by tasks.registering(Exec::class) {

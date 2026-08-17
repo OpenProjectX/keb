@@ -5,10 +5,16 @@ import com.microsoft.playwright.options.AriaRole.BUTTON
 import com.sun.net.httpserver.HttpServer
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
+import org.junit.jupiter.api.io.TempDir
 import java.net.InetSocketAddress
 import java.net.URI
+import java.nio.file.Files
+import java.nio.file.Path
 
 class KebDslTest {
     @Test
@@ -29,6 +35,61 @@ class KebDslTest {
                 }
                 assertEquals("/dashboard", URI(dashboard.currentUrl).path)
             }
+        }
+    }
+
+    @Test
+    fun `video can be retained for every session`(@TempDir temporaryDirectory: Path) {
+        val artifacts = temporaryDirectory.resolve("artifacts")
+        drive(
+            KebConfig(
+                videoMode = KebVideoMode.ON,
+                videoSize = KebVideoSize(640, 360),
+                artifactsDirectory = artifacts,
+                videoStagingDirectory = temporaryDirectory.resolve("staging"),
+            ),
+        ) {
+            page.setContent("<h1>Recorded journey</h1>")
+            page.waitForTimeout(100.0)
+        }
+
+        assertEquals(1, videosIn(artifacts).size)
+    }
+
+    @Test
+    fun `retain on failure removes passing video and keeps failing video`(@TempDir temporaryDirectory: Path) {
+        val passingArtifacts = temporaryDirectory.resolve("passing")
+        drive(
+            KebConfig(
+                videoMode = KebVideoMode.RETAIN_ON_FAILURE,
+                artifactsDirectory = passingArtifacts,
+                videoStagingDirectory = temporaryDirectory.resolve("passing-staging"),
+            ),
+        ) {
+            page.setContent("<h1>Passing journey</h1>")
+        }
+        assertFalse(Files.exists(passingArtifacts))
+
+        val failingArtifacts = temporaryDirectory.resolve("failing")
+        assertThrows<IllegalStateException> {
+            drive(
+                KebConfig(
+                    videoMode = KebVideoMode.RETAIN_ON_FAILURE,
+                    artifactsDirectory = failingArtifacts,
+                    videoStagingDirectory = temporaryDirectory.resolve("failing-staging"),
+                ),
+            ) {
+                page.setContent("<h1>Failing journey</h1>")
+                error("expected failure")
+            }
+        }
+        assertTrue(videosIn(failingArtifacts).isNotEmpty())
+    }
+
+    private fun videosIn(directory: Path): List<Path> {
+        if (Files.notExists(directory)) return emptyList()
+        return Files.walk(directory).use { paths ->
+            paths.filter { it.fileName.toString().endsWith(".webm") }.toList()
         }
     }
 

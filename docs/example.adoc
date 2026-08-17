@@ -17,6 +17,7 @@ The testing module resolves:
 ----
 org.openprojectx.test.keb:keb-core:<kebVersion>
 org.openprojectx.test.keb:keb-junit5:<kebVersion>
+org.openprojectx.test.keb:keb-allure:<kebVersion>
 ----
 
 from the repository-local Maven directory at `build/example-maven`.
@@ -45,6 +46,21 @@ The workflow:
 
 Snapshot dependency caching is disabled in the consumer build so a republished
 artifact is picked up immediately.
+
+== Record video
+
+Keep recordings only for failed tests:
+
+[source,shell]
+----
+./gradlew -p example :testing:test \
+  -Dkeb.video=retain-on-failure
+----
+
+Use `-Dkeb.video=on` to keep every recording. WebM files are written below
+`example/build/keb-artifacts`, grouped by test. The same properties work with
+`:testing:remoteTest`; Keb copies recordings from the Docker browser server
+back to the host artifact directory.
 
 == Remote browser in Docker
 
@@ -82,6 +98,7 @@ not override the npm registry and commits `bun.lock` for repeatable installs.
 The Material UI application includes:
 
 * application bar, drawer, breadcrumbs, avatars, badges, lists, and tooltips;
+* a three-level, accessible business navigation hierarchy;
 * text, email, password, date, select, autocomplete, radio, checkbox, switch,
   and slider inputs;
 * buttons, icon buttons, floating action buttons, links, menus, and pagination;
@@ -90,8 +107,34 @@ The Material UI application includes:
 
 The tests model the profile form, component playground, and team table as Keb
 modules. Locators primarily use accessible roles, labels, and visible names.
+The hierarchical navigation journey demonstrates numbered Given/When/Then
+steps, business metadata, step parameters, full-page screenshots, and focused
+component evidence in Allure.
+
+== Allure report
+
+The example applies the official Allure Gradle report plugin. Run the UI tests
+and generate the static HTML report with one task:
+
+[source,shell]
+----
+./gradlew -p example :testing:allureReport
+----
+
+Open
+`example/testing/build/reports/allure-report/allureReport/index.html`.
+The raw results remain in `example/testing/build/allure-results`. The report
+task depends on `:testing:test`, so Gradle schedules testing before rendering
+and applies its normal up-to-date checks.
+
+The example deliberately keeps raw Playwright AspectJ steps disabled. Its
+default report is the numbered business narrative, with Keb-owned screenshots,
+failure diagnostics, traces, and remote-safe videos. Developers can opt into
+raw action steps as described in link:reporting.adoc[the reporting guide].
 
 == Headed mode
+
+Set `keb.headless=false` when running the local browser:
 
 [source,shell]
 ----
@@ -99,3 +142,6 @@ modules. Locators primarily use accessible roles, labels, and visible names.
   -Dkeb.headless=false \
   -Dkeb.slowMoMillis=250
 ----
+
+`keb.headless` does not control a remote browser. The process hosting the
+Playwright server controls whether that browser has a visible display.

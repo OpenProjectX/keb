@@ -16,6 +16,10 @@ class LaboratoryPage(keb: KebSession) : KebPage(keb, "/") {
         css("#components")
     }
 
+    val workspaceNavigation by module(::WorkspaceNavigation) {
+        role(AriaRole.NAVIGATION, "Main navigation")
+    }
+
     val team by module(::TeamTable) {
         role(AriaRole.TABLE, "Team members")
     }
@@ -32,6 +36,14 @@ class LaboratoryPage(keb: KebSession) : KebPage(keb, "/") {
         role(AriaRole.NAVIGATION, "Main navigation")
     }
 
+    val selectedWorkspace by content {
+        testId("navigation-destination")
+    }
+
+    val selectedWorkspacePath by content {
+        testId("navigation-path")
+    }
+
     val toggleColorMode by content {
         role(AriaRole.BUTTON, "Toggle color mode")
     }
@@ -43,6 +55,29 @@ class LaboratoryPage(keb: KebSession) : KebPage(keb, "/") {
     override fun at() = verify {
         title.isVisible()
         url endsWith "/"
+    }
+}
+
+class WorkspaceNavigation(
+    keb: KebSession,
+    root: Locator,
+) : KebModule(keb, root) {
+    val customerExperience by content {
+        role(AriaRole.BUTTON, "Customer experience")
+    }
+
+    val digitalCommerce by content {
+        role(AriaRole.BUTTON, "Digital commerce")
+    }
+
+    val checkoutOperations by content {
+        role(AriaRole.BUTTON, "Checkout operations")
+    }
+
+    fun selectCheckoutOperations() {
+        customerExperience.click()
+        digitalCommerce.click()
+        checkoutOperations.click()
     }
 }
 

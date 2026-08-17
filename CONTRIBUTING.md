@@ -40,10 +40,10 @@ directories, credentials, or signing material.
 - Preserve source and binary compatibility when practical.
 - Add KDoc for public APIs whose behavior is not evident from their signature.
 
-Run the core and JUnit tests:
+Run the core, JUnit, and reporting tests:
 
 ```shell
-./gradlew :core:test :junit5:test
+./gradlew :core:test :junit5:test :allure:test
 ```
 
 ## Independent example

@@ -10,6 +10,7 @@ Playwright's native locators and auto-waiting.
 
 - `keb-core` — browser lifecycle and the page/module DSL.
 - `keb-junit5` — JUnit 5 session injection and failure screenshots.
+- `keb-allure` — business-readable journeys, evidence, traces, and Allure reporting.
 
 ## Quick start
 
@@ -50,6 +51,8 @@ configuration, the independent example, and releasing.
 
 Corporate users can follow the
 [restricted network setup guide](docs/corporate-network.adoc).
+See [Allure reporting](docs/reporting.adoc) for numbered BDD journeys and
+business-facing evidence.
 
 ## Build
 

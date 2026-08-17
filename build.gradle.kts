@@ -116,6 +116,7 @@ tasks.register("publishExampleArtifacts") {
     dependsOn(
         ":core:publishMavenJavaPublicationToExampleRepository",
         ":junit5:publishMavenJavaPublicationToExampleRepository",
+        ":allure:publishMavenJavaPublicationToExampleRepository",
     )
 }
 

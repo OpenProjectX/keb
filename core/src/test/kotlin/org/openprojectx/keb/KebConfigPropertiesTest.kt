@@ -27,6 +27,10 @@ class KebConfigPropertiesTest {
         System.setProperty("keb.actionTimeoutMillis", "5000")
         System.setProperty("keb.navigationTimeoutMillis", "15000")
         System.setProperty("keb.artifactsDirectory", "build/custom-artifacts")
+        System.setProperty("keb.video", "retain-on-failure")
+        System.setProperty("keb.videoWidth", "1280")
+        System.setProperty("keb.videoHeight", "720")
+        System.setProperty("keb.videoStagingDirectory", "build/video-staging")
 
         val config = KebConfig.fromSystemProperties()
 
@@ -39,6 +43,9 @@ class KebConfigPropertiesTest {
         assertEquals(5000.milliseconds, config.actionTimeout)
         assertEquals(15000.milliseconds, config.navigationTimeout)
         assertEquals(Path.of("build/custom-artifacts"), config.artifactsDirectory)
+        assertEquals(KebVideoMode.RETAIN_ON_FAILURE, config.videoMode)
+        assertEquals(KebVideoSize(1280, 720), config.videoSize)
+        assertEquals(Path.of("build/video-staging"), config.videoStagingDirectory)
     }
 
     @Test
@@ -96,6 +103,33 @@ class KebConfigPropertiesTest {
         }
     }
 
+    @Test
+    fun `video dimensions must be positive and configured together`() {
+        System.setProperty("keb.videoWidth", "1280")
+
+        val missingHeight = assertThrows<IllegalArgumentException> {
+            KebConfig.fromSystemProperties()
+        }
+        assertTrue(missingHeight.message.orEmpty().contains("keb.videoHeight"))
+
+        System.setProperty("keb.videoHeight", "0")
+        val invalidHeight = assertThrows<IllegalArgumentException> {
+            KebConfig.fromSystemProperties()
+        }
+        assertTrue(invalidHeight.message.orEmpty().contains("keb.videoHeight"))
+    }
+
+    @Test
+    fun `invalid video mode reports supported values`() {
+        System.setProperty("keb.video", "sometimes")
+
+        val error = assertThrows<IllegalArgumentException> {
+            KebConfig.fromSystemProperties()
+        }
+
+        assertTrue(error.message.orEmpty().contains("retain-on-failure"))
+    }
+
     companion object {
         private val propertyNames = listOf(
             "keb.baseUrl",
@@ -109,6 +143,10 @@ class KebConfigPropertiesTest {
             "keb.actionTimeoutMillis",
             "keb.navigationTimeoutMillis",
             "keb.artifactsDirectory",
+            "keb.video",
+            "keb.videoWidth",
+            "keb.videoHeight",
+            "keb.videoStagingDirectory",
         )
     }
 }

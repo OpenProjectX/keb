@@ -1,0 +1,205 @@
+= Business-readable Allure Reporting
+:toc:
+:toclevels: 3
+
+The optional `keb-allure` module turns a browser test into a numbered business
+journey while retaining Playwright diagnostics for developers. Business steps
+remain the top-level narrative; raw clicks, fills, and assertions can be shown
+as nested technical detail.
+
+== Add the integration
+
+[source,kotlin]
+----
+dependencies {
+    testImplementation("org.openprojectx.test.keb:keb-allure:<version>")
+}
+----
+
+`keb-allure` includes the Allure Jupiter runtime and registers itself through
+Keb's reporter service. No additional JUnit extension annotation is required.
+It writes raw results to `allure-results` unless
+`allure.results.directory` selects another directory. An Allure CLI, server,
+or CI integration is still required to render those files as an HTML report.
+
+== Describe the business scenario
+
+Use JUnit's display name as the report title and `@BusinessScenario` for
+business ownership and grouping:
+
+[source,kotlin]
+----
+@Test
+@DisplayName("Operations user opens the checkout workspace")
+@BusinessScenario(
+    epic = "Customer Experience",
+    feature = "Workspace Navigation",
+    story = "Navigate through the business hierarchy",
+    owner = "Digital Commerce Operations",
+    description = "The user follows the domain hierarchy to checkout operations.",
+)
+fun `open checkout workspace`(keb: KebSession) = keb.journey {
+    lateinit var laboratory: LaboratoryPage
+
+    given("the operations user is viewing the UI laboratory") {
+        laboratory = to<LaboratoryPage>()
+        parameter("Starting workspace", "UI laboratory")
+    }
+
+    whenever(
+        "the user follows the business hierarchy",
+        screenshot = Screenshot.AFTER,
+    ) {
+        laboratory.openNavigation.click()
+        laboratory.workspaceNavigation.selectCheckoutOperations()
+    }
+
+    then("the Checkout operations workspace is selected") {
+        laboratory.verify {
+            laboratory.selectedWorkspace containsText "Checkout operations"
+        }
+        evidence("Selected checkout workspace", laboratory.selectedWorkspace)
+    }
+}
+----
+
+Keb numbers steps in execution order and renders the keywords as `Given`,
+`When`, `Then`, and `And then`. Use `step` when a BDD keyword does not fit.
+`whenever` is used because `when` is a Kotlin keyword.
+
+== Evidence
+
+Each business step accepts a screenshot policy:
+
+`NONE`::
+Do not take a step screenshot, including when the step fails.
+
+`ON_FAILURE`::
+Capture the page if the step fails. This is the default.
+
+`BEFORE`, `AFTER`, `BEFORE_AND_AFTER`::
+Capture the requested business milestone. Attachments are nested under the
+step that produced them.
+
+Capture explicit page or element evidence with:
+
+[source,kotlin]
+----
+evidence("Complete checkout page")
+evidence("Order confirmation", page.orderConfirmation)
+attachText("Business rules", explanation)
+attachJson("Submitted order", orderJson)
+attachFile("Invoice", invoice, "application/pdf")
+----
+
+Mask sensitive regions in page or element screenshots:
+
+[source,kotlin]
+----
+then(
+    "payment is authorised",
+    screenshot = Screenshot.AFTER,
+    mask = listOf(page.cardNumber, page.securityCode),
+) {
+    page.paymentAccepted.shouldBeVisible()
+}
+----
+
+Use `parameter` for ordinary business values, `maskedParameter` when the report
+may show that a value exists, and `hiddenParameter` when its value must not be
+rendered. Masking report parameters does not mask pixels in screenshots.
+
+== Automatic failure diagnostics
+
+On failure, the integration attaches available diagnostics to the Allure test:
+
+* the Keb full-page failure screenshot;
+* page source;
+* retained browser console messages and page errors;
+* a Playwright trace archive;
+* every video retained by Keb's configured video policy.
+
+Trace collection defaults to `retain-on-failure`. Override it with:
+
+[source,shell]
+----
+./gradlew test -Dkeb.allure.trace=off
+./gradlew test -Dkeb.allure.trace=on
+----
+
+The `on` value retains traces for successful tests too. Videos continue to use
+`keb.video=off|retain-on-failure|on`. Keb saves remote videos with
+Playwright's `Video.saveAs`, then streams the client-local file to Allure.
+
+== Optional raw Playwright steps
+
+Add Allure's Playwright adapter and the AspectJ weaver when developers need
+clicks, fills, and assertions below each business step. Configure the adapter
+to provide steps only; Keb already supplies the evidence:
+
+[source,kotlin]
+----
+val allureAgent by configurations.creating
+
+dependencies {
+    testImplementation("io.qameta.allure:allure-playwright:<allure-version>")
+    allureAgent("org.aspectj:aspectjweaver:<aspectj-version>")
+}
+
+tasks.withType<Test>().configureEach {
+    doFirst { jvmArgs("-javaagent:${allureAgent.singleFile}") }
+}
+----
+
+[source,properties]
+----
+allure.playwright.steps.enabled=true
+allure.playwright.steps.mode=actions
+allure.playwright.parameters=redacted
+allure.playwright.screenshots.attach=false
+allure.playwright.failure.screenshot=false
+allure.playwright.failure.page-source=false
+allure.playwright.close.trace=false
+allure.playwright.close.video=false
+allure.playwright.close.page-logs=false
+----
+
+Run tests with `-javaagent:/path/to/aspectjweaver.jar` when configuring the JVM
+outside Gradle.
+
+WARNING: In the reviewed Allure Playwright 2.35.4 implementation, locator
+`fill` and `press` values can be used as the action target text before parameter
+redaction is applied. That can expose typed secrets in step names. Keb therefore
+does not enable raw AspectJ steps in the independent example. Do not opt in for
+sensitive journeys until the adapter version in use has verified target and
+parameter redaction. Business steps, evidence, traces, and videos do not require
+the AspectJ adapter.
+
+== Render the report
+
+The independent example uses the official Allure Gradle report plugin. From
+the Keb repository, run:
+
+[source,shell]
+----
+./gradlew -p example :testing:allureReport
+----
+
+The generated entry point is
+`example/testing/build/reports/allure-report/allureReport/index.html`. The task
+schedules `:testing:test` first. Applying only `io.qameta.allure-report` is
+intentional: `keb-allure` already collects the results, so the example does not
+need a second adapter or AspectJ instrumentation. Add `--rerun-tasks
+--no-build-cache` when a completely fresh test and report are required.
+
+Projects that use an installed Allure CLI can still render manually:
+
+[source,shell]
+----
+allure generate build/allure-results --clean --output build/allure-report
+allure open build/allure-report
+----
+
+For CI, upload `allure-results` as an artifact or pass it to the organisation's
+Allure server. The Java dependencies generate results but do not install the
+Allure renderer unless a report plugin such as the example's is applied.

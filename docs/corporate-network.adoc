@@ -64,6 +64,16 @@ or proxied from an approved snapshot source.
 The Playwright Maven dependency contains its Java API and driver bundle. It
 does not contain the separately installed browsers.
 
+Allure users should also proxy `io.qameta.allure` artifacts and the Allure
+Gradle plugin marker and implementation artifacts. The example's report plugin
+provisions Allure 3 during `downloadAllure`: it downloads a Node distribution
+and installs the pinned `allure` npm package. Restricted builds must provide an
+approved Node download mirror plus a JFrog npm virtual repository, or
+pre-populate the Gradle runtime directory. npm registry and proxy settings are
+honoured for the package install. Proxy `org.aspectj:aspectjweaver` only when
+raw Playwright action steps are enabled. An alternative is to preinstall an
+approved Allure CLI or send `allure-results` to an internal Allure server.
+
 === Settings example
 
 [source,kotlin]
@@ -164,6 +174,10 @@ The application URL must be reachable from the browser pod. Add internal
 service names to `NO_PROXY` when pods inherit corporate proxy variables. Keep
 the Java client and browser server on the same Playwright major and minor
 version; patch versions may differ.
+
+For video recording, ensure `keb.videoStagingDirectory` is writable inside the
+browser pod. Keb transfers retained WebM files to the test runner, so the
+staging directory does not need shared storage.
 
 === Approved local Google Chrome or Microsoft Edge
 
@@ -377,6 +391,7 @@ Verify these items on a clean restricted machine:
 * [ ] The Gradle distribution resolves without public internet.
 * [ ] Kotlin and Gradle plugins resolve through JFrog.
 * [ ] Keb, Playwright, and JUnit resolve through JFrog.
+* [ ] Allure, AspectJ, and an approved report renderer are available if reporting is enabled.
 * [ ] One approved browser strategy is documented and tested.
 * [ ] Native browser libraries and fonts are installed.
 * [ ] Corporate CA certificates are installed for Java and the browser.

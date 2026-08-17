@@ -12,6 +12,28 @@ public enum class KebBrowserName {
     WEBKIT,
 }
 
+public enum class KebVideoMode {
+    /** Do not record video. */
+    OFF,
+
+    /** Record every session, retaining files only when the test failed. */
+    RETAIN_ON_FAILURE,
+
+    /** Retain video for every session. */
+    ON,
+}
+
+/** Video frame dimensions in pixels. */
+public data class KebVideoSize(
+    val width: Int,
+    val height: Int,
+) {
+    init {
+        require(width > 0) { "video width must be greater than zero" }
+        require(height > 0) { "video height must be greater than zero" }
+    }
+}
+
 public data class KebConfig(
     val baseUrl: URI? = null,
     val browser: KebBrowserName = KebBrowserName.CHROMIUM,
@@ -24,6 +46,9 @@ public data class KebConfig(
     val actionTimeout: Duration = 10.seconds,
     val navigationTimeout: Duration = 30.seconds,
     val artifactsDirectory: Path = Path.of("build", "keb-artifacts"),
+    val videoMode: KebVideoMode = KebVideoMode.OFF,
+    val videoSize: KebVideoSize? = null,
+    val videoStagingDirectory: Path = Path.of(".keb-video-staging"),
 ) {
     init {
         require(actionTimeout.isPositive()) { "actionTimeout must be positive" }
@@ -71,6 +96,9 @@ public data class KebConfig(
          * - `keb.actionTimeoutMillis`
          * - `keb.navigationTimeoutMillis`
          * - `keb.artifactsDirectory`
+         * - `keb.video` (`off`, `retain-on-failure`, or `on`)
+         * - `keb.videoWidth` and `keb.videoHeight`
+         * - `keb.videoStagingDirectory`
          */
         public fun fromSystemProperties(defaults: KebConfig = KebConfig()): KebConfig =
             defaults.copy(
@@ -117,6 +145,13 @@ public data class KebConfig(
                 artifactsDirectory = property("keb.artifactsDirectory")
                     ?.let(Path::of)
                     ?: defaults.artifactsDirectory,
+                videoMode = property("keb.video")
+                    ?.let(::videoMode)
+                    ?: defaults.videoMode,
+                videoSize = videoSize(defaults.videoSize),
+                videoStagingDirectory = property("keb.videoStagingDirectory")
+                    ?.let(Path::of)
+                    ?: defaults.videoStagingDirectory,
             )
 
         private fun property(name: String): String? =
@@ -133,6 +168,35 @@ public data class KebConfig(
                 "$name must be ${if (allowZero) "zero or greater" else "greater than zero"}; was '$value'"
             }
             return number.milliseconds
+        }
+
+        private fun videoMode(value: String): KebVideoMode =
+            runCatching {
+                KebVideoMode.valueOf(value.uppercase().replace('-', '_'))
+            }.getOrElse {
+                throw IllegalArgumentException(
+                    "keb.video must be off, retain-on-failure, or on; was '$value'",
+                )
+            }
+
+        private fun videoSize(default: KebVideoSize?): KebVideoSize? {
+            val width = property("keb.videoWidth")
+            val height = property("keb.videoHeight")
+            if (width == null && height == null) return default
+            require(width != null && height != null) {
+                "keb.videoWidth and keb.videoHeight must be configured together"
+            }
+            return KebVideoSize(
+                width = positiveInt("keb.videoWidth", width),
+                height = positiveInt("keb.videoHeight", height),
+            )
+        }
+
+        private fun positiveInt(name: String, value: String): Int {
+            val number = value.toIntOrNull()
+                ?: throw IllegalArgumentException("$name must be an integer; was '$value'")
+            require(number > 0) { "$name must be greater than zero; was '$value'" }
+            return number
         }
     }
 }

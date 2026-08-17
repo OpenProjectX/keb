@@ -17,6 +17,9 @@ val config = KebConfig(
     actionTimeout = 10.seconds,
     navigationTimeout = 30.seconds,
     artifactsDirectory = Path.of("build/keb-artifacts"),
+    videoMode = KebVideoMode.RETAIN_ON_FAILURE,
+    videoSize = KebVideoSize(width = 1280, height = 720),
+    videoStagingDirectory = Path.of(".keb-video-staging"),
 )
 ----
 
@@ -31,6 +34,7 @@ val config = KebConfig(
     baseUrl = "https://example.test",
     browser = KebBrowserName.CHROMIUM,
     headless = true,
+    video = KebVideoMode.RETAIN_ON_FAILURE,
 )
 class BrowserTest
 ----
@@ -75,6 +79,15 @@ JVM system properties override annotation or programmatic defaults.
 
 |`keb.artifactsDirectory`
 |`build/keb-artifacts`
+
+|`keb.video`
+|`off`, `retain-on-failure`, or `on`
+
+|`keb.videoWidth`, `keb.videoHeight`
+|`1280`, `720` (must be configured together)
+
+|`keb.videoStagingDirectory`
+|`.keb-video-staging`
 |===
 
 == Remote browser
@@ -148,11 +161,41 @@ tasks.test {
 }
 ----
 
-== Failure artifacts
+== Screenshots and video
 
 The JUnit extension attempts to capture a full-page screenshot when a test
-fails. The default directory is `build/keb-artifacts` and can be changed through
-configuration or `keb.artifactsDirectory`.
+fails. Enable video recording with a retention policy:
+
+[source,shell]
+----
+./gradlew test -Dkeb.video=retain-on-failure
+----
+
+`off` is the default. `on` keeps videos for every test.
+`retain-on-failure` records every test but deletes videos from successful
+tests. Recording cannot start retroactively after a failure. Each page,
+including popups, produces a separate WebM file.
+
+JUnit artifacts are grouped into collision-resistant test directories:
+
+[source,text]
+----
+build/keb-artifacts/
+└── profile-form-supports-common-input-controls-a81f39/
+    ├── failure.png
+    └── video-1.webm
+----
+
+Change the root with `keb.artifactsDirectory`. `keb.videoStagingDirectory` is
+where Playwright creates recordings before Keb retains or deletes them. For a
+remote browser it must be writable on the browser server. Keb uses
+`Video.saveAs`, so retained files are copied back to the test runner even when
+the browser runs in another pod.
+
+JUnit and `drive {}` automatically pass the test outcome into session cleanup.
+Other integrations should call `session.close(failed, artifactDirectory)` so
+`retain-on-failure` can apply the correct policy. Videos are finalized only
+when the browser context closes.
 
 == Threading
 

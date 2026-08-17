@@ -61,6 +61,7 @@ tags through branch protection
 ----
 org.openprojectx.test.keb:keb-core:<version>
 org.openprojectx.test.keb:keb-junit5:<version>
+org.openprojectx.test.keb:keb-allure:<version>
 ----
 
 The Gradle Release Plugin removes the `-SNAPSHOT` suffix, creates the release
@@ -70,7 +71,7 @@ to the next snapshot version.
 Sonatype's OSSRH compatibility service transfers a closed repository to the
 Central Publisher Portal asynchronously. Keb sends the promote request without
 polling the compatibility repository for a final state. Before a release, the
-workflow also checks Maven Central: if both artifacts already exist, it skips
+workflow also checks Maven Central: if all artifacts already exist, it skips
 the immutable upload and recovers only the Git release commit, tag, and next
 snapshot version.
 

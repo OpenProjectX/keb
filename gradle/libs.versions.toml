@@ -10,6 +10,7 @@ kotlinxCoroutines = "1.10.2"
 springBoot = "4.0.5"
 playwright = "1.62.0"
 junit = "5.13.4"
+allure = "2.35.4"
 
 [libraries]
 kotlinGradlePlugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
@@ -23,6 +24,8 @@ junitBom = { module = "org.junit:junit-bom", version.ref = "junit" }
 junitJupiterApi = { module = "org.junit.jupiter:junit-jupiter-api" }
 junitJupiterEngine = { module = "org.junit.jupiter:junit-jupiter-engine" }
 junitPlatformLauncher = { module = "org.junit.platform:junit-platform-launcher" }
+allureJavaCommons = { module = "io.qameta.allure:allure-java-commons", version.ref = "allure" }
+allureJupiter = { module = "io.qameta.allure:allure-jupiter", version.ref = "allure" }
 
 # Libraries can be bundled together for easier import
 [bundles]
