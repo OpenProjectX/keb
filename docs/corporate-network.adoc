@@ -140,6 +140,31 @@ tasks.register<JavaExec>("playwright") {
 
 Then replace `:core:playwright` with `playwright` in installation commands.
 
+=== Remote browser service
+
+A browser pod removes browser binaries and native libraries from the test
+runner. Mirror `mcr.microsoft.com/playwright:v1.62.1` into the internal
+container registry and bake `playwright@1.62.1` into the image from the JFrog
+npm repository; do not depend on `npx` reaching the public registry at pod
+startup.
+
+Expose the Playwright server with an internal ClusterIP Service, restrict it
+with a NetworkPolicy, and configure the test runner:
+
+[source,shell]
+----
+export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+
+./gradlew test \
+  -Dkeb.remoteEndpoint=ws://playwright.browser.svc.cluster.local:3000/ \
+  -Dkeb.baseUrl=http://application.application.svc.cluster.local:8080
+----
+
+The application URL must be reachable from the browser pod. Add internal
+service names to `NO_PROXY` when pods inherit corporate proxy variables. Keep
+the Java client and browser server on the same Playwright major and minor
+version; patch versions may differ.
+
 === Approved local Google Chrome or Microsoft Edge
 
 This is usually the simplest option when a browser is already installed and

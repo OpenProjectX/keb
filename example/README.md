@@ -13,6 +13,12 @@ From the repository root:
 ./gradlew -p example check
 ```
 
+Run the same tests against Playwright in Docker:
+
+```shell
+./gradlew -p example :testing:remoteTest
+```
+
 Start the UI:
 
 ```shell

@@ -18,6 +18,8 @@ public data class KebConfig(
     val headless: Boolean = true,
     val browserChannel: String? = null,
     val executablePath: Path? = null,
+    val remoteEndpoint: URI? = null,
+    val remoteConnectTimeout: Duration = 30.seconds,
     val slowMotion: Duration? = null,
     val actionTimeout: Duration = 10.seconds,
     val navigationTimeout: Duration = 30.seconds,
@@ -26,6 +28,7 @@ public data class KebConfig(
     init {
         require(actionTimeout.isPositive()) { "actionTimeout must be positive" }
         require(navigationTimeout.isPositive()) { "navigationTimeout must be positive" }
+        require(remoteConnectTimeout.isPositive()) { "remoteConnectTimeout must be positive" }
         require(slowMotion == null || !slowMotion.isNegative()) {
             "slowMotion must not be negative"
         }
@@ -34,6 +37,12 @@ public data class KebConfig(
         }
         require(browserChannel == null || browser == KebBrowserName.CHROMIUM) {
             "browserChannel is supported only with the Chromium browser type"
+        }
+        require(remoteEndpoint == null || remoteEndpoint.scheme in setOf("ws", "wss")) {
+            "remoteEndpoint must use the ws or wss scheme"
+        }
+        require(remoteEndpoint == null || browserChannel == null && executablePath == null) {
+            "browserChannel and executablePath cannot be used with remoteEndpoint"
         }
     }
 
@@ -56,6 +65,8 @@ public data class KebConfig(
          * - `keb.headless`
          * - `keb.browserChannel`
          * - `keb.executablePath`
+         * - `keb.remoteEndpoint`
+         * - `keb.remoteConnectTimeoutMillis`
          * - `keb.slowMoMillis`
          * - `keb.actionTimeoutMillis`
          * - `keb.navigationTimeoutMillis`
@@ -88,6 +99,12 @@ public data class KebConfig(
                 executablePath = property("keb.executablePath")
                     ?.let(Path::of)
                     ?: defaults.executablePath,
+                remoteEndpoint = property("keb.remoteEndpoint")
+                    ?.let(URI::create)
+                    ?: defaults.remoteEndpoint,
+                remoteConnectTimeout = property("keb.remoteConnectTimeoutMillis")
+                    ?.let { milliseconds("keb.remoteConnectTimeoutMillis", it) }
+                    ?: defaults.remoteConnectTimeout,
                 slowMotion = property("keb.slowMoMillis")
                     ?.let { milliseconds("keb.slowMoMillis", it, allowZero = true) }
                     ?: defaults.slowMotion,

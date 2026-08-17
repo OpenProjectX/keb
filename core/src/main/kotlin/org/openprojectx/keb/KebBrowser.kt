@@ -32,16 +32,25 @@ public class KebBrowser private constructor(
                 KebBrowserName.FIREFOX -> playwright.firefox()
                 KebBrowserName.WEBKIT -> playwright.webkit()
             }
-            val launchOptions = BrowserType.LaunchOptions()
-                .setHeadless(config.headless)
-            config.browserChannel?.let(launchOptions::setChannel)
-            config.executablePath?.let(launchOptions::setExecutablePath)
-            config.slowMotion?.let {
-                launchOptions.setSlowMo(it.inWholeMilliseconds.toDouble())
-            }
-
             return try {
-                KebBrowser(playwright, browserType.launch(launchOptions), config)
+                val browser = config.remoteEndpoint?.let { endpoint ->
+                    val connectOptions = BrowserType.ConnectOptions()
+                        .setTimeout(config.remoteConnectTimeout.inWholeMilliseconds.toDouble())
+                    config.slowMotion?.let {
+                        connectOptions.setSlowMo(it.inWholeMilliseconds.toDouble())
+                    }
+                    browserType.connect(endpoint.toString(), connectOptions)
+                } ?: run {
+                    val launchOptions = BrowserType.LaunchOptions()
+                        .setHeadless(config.headless)
+                    config.browserChannel?.let(launchOptions::setChannel)
+                    config.executablePath?.let(launchOptions::setExecutablePath)
+                    config.slowMotion?.let {
+                        launchOptions.setSlowMo(it.inWholeMilliseconds.toDouble())
+                    }
+                    browserType.launch(launchOptions)
+                }
+                KebBrowser(playwright, browser, config)
             } catch (error: Throwable) {
                 playwright.close()
                 throw error

@@ -11,6 +11,8 @@ val config = KebConfig(
     headless = true,
     browserChannel = null,
     executablePath = null,
+    remoteEndpoint = null,
+    remoteConnectTimeout = 30.seconds,
     slowMotion = 250.milliseconds,
     actionTimeout = 10.seconds,
     navigationTimeout = 30.seconds,
@@ -56,6 +58,12 @@ JVM system properties override annotation or programmatic defaults.
 |`keb.executablePath`
 |`/opt/company/chrome/chrome`
 
+|`keb.remoteEndpoint`
+|`ws://playwright-server:3000/`
+
+|`keb.remoteConnectTimeoutMillis`
+|`30000`
+
 |`keb.slowMoMillis`
 |`250`
 
@@ -68,6 +76,34 @@ JVM system properties override annotation or programmatic defaults.
 |`keb.artifactsDirectory`
 |`build/keb-artifacts`
 |===
+
+== Remote browser
+
+Set `keb.remoteEndpoint` to connect with Playwright's native WebSocket protocol
+instead of launching a browser in the test process:
+
+[source,shell]
+----
+./gradlew test \
+  -Dkeb.remoteEndpoint=ws://playwright-server:3000/ \
+  -Dkeb.baseUrl=http://application:8080
+----
+
+Set `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` on remote-only test clients. The Java
+driver is still required for the protocol connection, but no browser binary is
+launched on that machine.
+
+The client and server must use the same Playwright major and minor version.
+Patch versions may differ, so the Java `1.62.0` client is compatible with the
+`1.62.1` example server. The browser server controls its launch environment,
+so `keb.headless`, `keb.browserChannel`, and `keb.executablePath` are
+local-launch settings; channel and executable path are rejected when a remote
+endpoint is configured. Closing `KebBrowser` closes its contexts and
+disconnects without stopping the remote Playwright server.
+
+In Kubernetes, expose the Playwright server with a ClusterIP Service and use
+its WebSocket URL for `keb.remoteEndpoint`. The application URL must be
+reachable from the browser pod, not merely from the test-runner pod.
 
 Apply properties explicitly outside JUnit:
 

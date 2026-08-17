@@ -46,6 +46,25 @@ The workflow:
 Snapshot dependency caching is disabled in the consumer build so a republished
 artifact is picked up immediately.
 
+== Remote browser in Docker
+
+The example can run the same journeys from the host JVM against a Playwright
+server in `mcr.microsoft.com/playwright:v1.62.1`:
+
+[source,shell]
+----
+./gradlew publishExampleArtifacts
+./gradlew -p example :testing:remoteTest
+----
+
+The task uses `example/compose.yaml`, waits for the browser server, forwards
+`keb.remoteEndpoint=ws://127.0.0.1:3000/`, and tears the container down after
+the tests. It also disables local Playwright browser downloads. The browser
+reaches Vite through `http://host.docker.internal:4173`; the Compose
+configuration installs the Linux host-gateway mapping and adds that hostname
+to `NO_PROXY`. Docker Compose v2 and access to the Microsoft and npm registries
+are required on the first run.
+
 == UI development
 
 [source,shell]
