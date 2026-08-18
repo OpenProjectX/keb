@@ -1,0 +1,73 @@
+= Offline example image
+
+Each successful release publishes a self-contained example image:
+
+[source,text]
+----
+ghcr.io/openprojectx/keb-example:<version>
+ghcr.io/openprojectx/keb-example:latest
+----
+
+The versioned image is built from the matching `keb-<version>` Git tag. It
+contains the complete source tree, locally published Keb Maven artifacts,
+compiled example outputs, Gradle distribution and dependency cache, Bun and
+`node_modules`, Chromium with its operating-system libraries, and the installed
+Allure report runtime.
+
+== Run without internet
+
+Pull the image while connected, then disconnect it from the network:
+
+[source,shell]
+----
+docker pull ghcr.io/openprojectx/keb-example:<version>
+docker run --rm --network none \
+  ghcr.io/openprojectx/keb-example:<version>
+----
+
+The default command forces Kotlin compilation, the Vite production build, and
+all local browser tests. It skips `bunInstall`, resolves Gradle strictly with
+`--offline`, and then generates the Allure HTML report.
+
+To copy the generated report to the host, use a named container:
+
+[source,shell]
+----
+docker create --name keb-example-report --network none \
+  ghcr.io/openprojectx/keb-example:<version>
+docker start --attach keb-example-report
+docker cp keb-example-report:/workspace/example/testing/build/reports/allure-report/allureReport \
+  ./allure-report
+docker rm keb-example-report
+----
+
+Open `allure-report/index.html`.
+
+== Inspect or modify the bundled source
+
+[source,shell]
+----
+docker run --rm -it --network none \
+  ghcr.io/openprojectx/keb-example:<version> bash
+----
+
+The repository is `/workspace`. If files or dependency declarations are
+changed, offline execution succeeds only while every required artifact is
+already present in the image. Build a new image while connected to add new
+dependencies.
+
+== Build locally
+
+[source,shell]
+----
+docker build \
+  --file docker/Dockerfile.offline-example \
+  --build-arg KEB_VERSION=0.1.6-SNAPSHOT \
+  --tag keb-example:local \
+  .
+----
+
+The Dockerfile performs its final smoke test with BuildKit
+`RUN --network=none`. Image creation fails if the example or report renderer
+attempts an internet download.
+

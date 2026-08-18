@@ -47,6 +47,11 @@ GitHub Actions caches improve repeat-run speed, but a cold cache is not an
 artifact source. A new runner still needs an internal source or a prebuilt
 image.
 
+If the corporate registry mirrors GHCR, the released
+link:offline-image.adoc[offline example image] packages the source, Maven and
+npm dependencies, browser, build tools, and Allure renderer together. Pull it
+once into the approved registry and run it with `--network none`.
+
 == Configure JFrog for Gradle
 
 === Repository requirements

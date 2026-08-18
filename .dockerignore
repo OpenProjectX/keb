@@ -1,0 +1,16 @@
+.git
+.idea
+.gradle
+**/.gradle
+**/build
+**/node_modules
+**/allure-results
+**/allure-report
+.env
+.env.*
+**/.env
+**/.env.*
+**/*.asc
+**/*.key
+**/*.pem
+**/local.properties

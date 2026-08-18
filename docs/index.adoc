@@ -46,6 +46,7 @@ diagnostics, traces, videos, and Allure metadata.
 * link:dsl.adoc[Pages, modules, and the Kotlin DSL]
 * link:configuration.adoc[Configuration and runtime properties]
 * link:reporting.adoc[Business-readable Allure reporting]
+* link:offline-image.adoc[Offline example Docker image]
 * link:corporate-network.adoc[Restricted corporate network setup]
 * link:example.adoc[Independent React and Material UI example]
 * link:releasing.adoc[Release process]

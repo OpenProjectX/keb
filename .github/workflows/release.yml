@@ -51,6 +51,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
 
+    outputs:
+      release_version: ${{ steps.release_metadata.outputs.release_version }}
+      release_tag: ${{ steps.release_metadata.outputs.release_tag }}
+
     env:
       GRADLE_OPTS: >-
         -Dorg.gradle.daemon=false
@@ -143,6 +147,7 @@ jobs:
           printf '%s' "$SIGNING_KEY_ASC" > "$RUNNER_TEMP/signing-key.asc"
 
       - name: Capture release metadata
+        id: release_metadata
         run: |
           release_version="$(awk -F= '/^[[:space:]]*version[[:space:]]*=/{gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2); print $2; exit}' gradle.properties)"
           if [ -z "$release_version" ]; then
@@ -151,6 +156,8 @@ jobs:
           fi
           release_version="${release_version%-SNAPSHOT}"
           echo "RELEASE_VERSION=${release_version}" >> "$GITHUB_ENV"
+          echo "release_version=${release_version}" >> "$GITHUB_OUTPUT"
+          echo "release_tag=keb-${release_version}" >> "$GITHUB_OUTPUT"
           release_already_published=true
           for artifact in keb-core keb-junit5 keb-allure; do
             artifact_url="https://repo.maven.apache.org/maven2/org/openprojectx/test/keb/${artifact}/${release_version}/${artifact}-${release_version}.pom"
@@ -234,4 +241,53 @@ jobs:
             done
             echo
             echo "> Maven Central search can lag for a short time after Sonatype release completes."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  offline-example-image:
+    name: Build offline example image
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout released source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.release_tag }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build, verify offline, and publish image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile.offline-example
+          push: true
+          build-args: |
+            KEB_VERSION=${{ needs.release.outputs.release_version }}
+          tags: |
+            ghcr.io/openprojectx/keb-example:${{ needs.release.outputs.release_version }}
+            ghcr.io/openprojectx/keb-example:latest
+          cache-from: type=gha,scope=keb-offline-example
+          cache-to: type=gha,mode=max,scope=keb-offline-example
+
+      - name: Write image summary
+        run: |
+          {
+            echo "## Offline example image"
+            echo
+            echo "- Image: \`ghcr.io/openprojectx/keb-example:${{ needs.release.outputs.release_version }}\`"
+            echo "- Source tag: \`${{ needs.release.outputs.release_tag }}\`"
+            echo "- Offline browser test and Allure report generation: verified during image build"
           } >> "$GITHUB_STEP_SUMMARY"

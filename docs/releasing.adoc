@@ -81,3 +81,9 @@ its legacy profile-discovery endpoint.
 
 If the workflow fails, test reports, build reports, and Keb failure artifacts
 are uploaded for diagnosis.
+
+After the Maven/Git release succeeds, a separate job checks out the exact
+`keb-<version>` tag and publishes `ghcr.io/openprojectx/keb-example:<version>`
+and `latest`. The Dockerfile runs the example tests and Allure renderer in a
+network-disabled build step before the image is pushed. See
+link:offline-image.adoc[Offline example image].

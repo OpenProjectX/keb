@@ -89,6 +89,14 @@ tasks.named("allureReport") {
     dependsOn(tasks.test)
 }
 
+tasks.register("resolveTestRuntimeDependencies") {
+    group = "help"
+    description = "Resolves the complete test runtime classpath for offline images"
+    doLast {
+        configurations.testRuntimeClasspath.get().resolve()
+    }
+}
+
 val remoteBrowserUp by tasks.registering(Exec::class) {
     group = "verification"
     description = "Starts the Playwright 1.62.1 browser server in Docker"
