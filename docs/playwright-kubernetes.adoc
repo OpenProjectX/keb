@@ -1,0 +1,199 @@
+= Playwright Server on Kubernetes
+:toc:
+
+Keb includes `charts/playwright-server`, a Helm chart for a long-running
+Playwright server. Each WebSocket connection receives an isolated browser
+process. The server remains running when a client disconnects and accepts the
+next connection.
+
+The chart creates a `Deployment`, `ClusterIP` `Service`, and optionally a
+Gateway API `HTTPRoute`. It does not create an `Ingress`.
+
+== Requirements
+
+* Kubernetes with Gateway API `v1` when `httpRoute.enabled=true`;
+* an existing `Gateway` listener that permits routes from the release namespace;
+* a hostname resolving to that Gateway;
+* enough pod memory for the configured concurrent browsers;
+* client and server Playwright versions with the same major and minor version.
+
+The default image is `ghcr.io/openprojectx/playwright-server:latest`. It
+contains Playwright `1.62.1`, its CLI, browser binaries, and operating-system
+dependencies. Startup does not contact an npm registry or download browsers.
+Mirror or preload this image for an offline cluster. For reproducible
+environments, override `image.tag` with a published numeric tag instead of
+`latest`.
+
+== Install with an HTTPRoute
+
+Create a values file for the cluster:
+
+[source,yaml]
+----
+fullnameOverride: playwright
+
+playwright:
+  maxClients: 2
+
+httpRoute:
+  enabled: true
+  parentRefs:
+    - name: shared-gateway
+      namespace: gateway-system
+      sectionName: https
+  hostnames:
+    - playwright.example.com
+----
+
+Use an unguessable path. The path is a capability URL and prevents casual
+discovery, but it is not a substitute for network policy or authenticated
+Gateway authorization.
+
+[source,shell]
+----
+PLAYWRIGHT_PATH="/$(openssl rand -hex 24)"
+
+helm upgrade --install playwright charts/playwright-server \
+  --namespace keb \
+  --create-namespace \
+  -f my-values.yaml \
+  --set-string playwright.path="$PLAYWRIGHT_PATH" \
+  --wait
+----
+
+The Gateway terminates TLS and forwards the WebSocket upgrade through the
+`HTTPRoute`. Configure Keb with the external `wss` endpoint:
+
+[source,shell]
+----
+./gradlew test \
+  -Dkeb.remoteEndpoint="wss://playwright.example.com${PLAYWRIGHT_PATH}" \
+  -Dkeb.baseUrl=https://application.example.com
+----
+
+The application URL must be reachable from the Playwright pod, because the
+browser runs there.
+
+== Upgrades
+
+Keep the generated path stable. Either supply the same protected value on each
+upgrade or reuse the release values:
+
+[source,shell]
+----
+helm upgrade playwright charts/playwright-server \
+  --namespace keb \
+  --reuse-values \
+  --wait
+----
+
+Retrieve an existing endpoint without storing it in a repository:
+
+[source,shell]
+----
+HOST=$(kubectl -n keb get httproute playwright \
+  -o jsonpath='{.spec.hostnames[0]}')
+PATH_VALUE=$(helm -n keb get values playwright -o json \
+  | jq -r '.playwright.path')
+echo "wss://${HOST}${PATH_VALUE}"
+----
+
+== Capacity and isolation
+
+`playwright.maxClients` is the maximum number of simultaneous WebSocket
+clients in one pod. Additional clients wait for a slot. Every accepted client
+gets a separate browser process and can create isolated browser contexts.
+
+Start with one replica when exposing a single long-lived WebSocket endpoint.
+Horizontal scaling requires the Gateway to keep each WebSocket connection on
+one backend for its lifetime, which normal WebSocket routing does naturally.
+Size CPU and memory for the worst-case number of active clients; a limit of two
+clients is intentionally conservative for the default 3 GiB memory limit.
+
+The chart mounts a memory-backed `emptyDir` at `/dev/shm`, with a default
+`sharedMemory.sizeLimit` of `1Gi`. This gives Chromium adequate shared memory
+for renderer processes instead of the small container-runtime default. The
+tmpfs usage counts toward the pod's memory consumption, so include it when
+sizing `resources.limits.memory`. Set `sharedMemory.enabled=false` only when
+the runtime already supplies a suitable `/dev/shm` mount.
+
+The Playwright server does not provide user accounts, authorization, quotas,
+or durable session recovery. For a shared service, add Gateway authentication,
+restrict source networks, apply a `NetworkPolicy`, and operate separate
+releases or namespaces for stronger tenant isolation.
+
+== Operations
+
+[source,shell]
+----
+kubectl -n keb get deploy,pod,service,httproute
+kubectl -n keb describe httproute playwright
+kubectl -n keb logs deployment/playwright
+----
+
+The pod exposes `/json` only through the internal Service probes. The
+`HTTPRoute` matches only the configured WebSocket path.
+
+== End-to-end example verification
+
+Build the React demo, publish it to two ConfigMaps, and deploy the included
+unprivileged nginx workload:
+
+[source,shell]
+----
+./gradlew -p example :ui:bunBuild
+
+kubectl -n keb create configmap keb-example-ui-index \
+  --from-file=index.html=example/ui/dist/index.html \
+  --dry-run=client -o yaml | kubectl apply --server-side -f -
+
+kubectl -n keb create configmap keb-example-ui-assets \
+  --from-file=example/ui/dist/assets \
+  --dry-run=client -o yaml | kubectl apply --server-side -f -
+
+kubectl -n keb apply -f example/kubernetes/demo-ui.yaml
+kubectl -n keb rollout status deployment/keb-example-ui
+----
+
+Run the Kotlin tests on the developer machine while Chromium runs in the
+Kubernetes Playwright pod:
+
+[source,shell]
+----
+HOST=$(kubectl -n keb get httproute playwright \
+  -o jsonpath='{.spec.hostnames[0]}')
+PATH_VALUE=$(helm -n keb get values playwright -o json \
+  | jq -r '.playwright.path')
+REMOTE_ENDPOINT="wss://${HOST}${PATH_VALUE}"
+
+./gradlew publishExampleArtifacts
+./gradlew -p example :testing:test \
+  -PkebVersion=$(awk -F= '/^version/{gsub(/ /, "", $2); print $2}' gradle.properties) \
+  -Dkeb.remoteEndpoint="$REMOTE_ENDPOINT" \
+  -Dkeb.baseUrl=http://keb-example-ui.keb.svc.cluster.local
+----
+
+The test JVM and report generation remain local. Page rendering and browser
+actions run remotely, and the browser reaches the demo through its ClusterIP
+Service.
+
+To connect without a public route, disable `httpRoute` and use the cluster DNS
+endpoint from a test-runner pod:
+
+[source,text]
+----
+ws://playwright.keb.svc.cluster.local:3000/<configured-path>
+----
+
+== Current cluster example
+
+`values-cn-guangzhou-a.yaml` attaches the release to
+`istio-ingress/k8s-infra-gateway`, listener `cluster-https`, using:
+
+[source,text]
+----
+wss://playwright.cn-guangzhou-a.k8s.openprojectx.org/<generated-path>
+----
+
+The generated path is supplied at deployment time and is deliberately not
+committed.

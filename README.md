@@ -53,6 +53,8 @@ Corporate users can follow the
 [restricted network setup guide](docs/corporate-network.adoc).
 See [Allure reporting](docs/reporting.adoc) for numbered BDD journeys and
 business-facing evidence.
+For a shared remote browser, see the
+[Playwright Kubernetes Helm chart](docs/playwright-kubernetes.adoc).
 Released versions also include a self-contained
 [offline example image](docs/offline-image.adoc).
 

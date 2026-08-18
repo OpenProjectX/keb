@@ -1,0 +1,124 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "playwright-server.fullname" . }}
+  labels:
+    {{- include "playwright-server.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      {{- include "playwright-server.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/runtime: {{ toJson .Values.playwright | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "playwright-server.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "playwright-server.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: playwright
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          workingDir: /home/pwuser
+          stdin: true
+          command:
+            - playwright
+            - run-server
+          args:
+            - --host
+            - {{ .Values.playwright.host | quote }}
+            - --port
+            - {{ .Values.playwright.port | quote }}
+            - --path
+            - {{ .Values.playwright.path | quote }}
+            - --max-clients
+            - {{ .Values.playwright.maxClients | quote }}
+            - --artifacts-dir
+            - {{ .Values.playwright.artifactsDirectory | quote }}
+            {{- if .Values.playwright.unsafeLaunchOptions }}
+            - --unsafe
+            {{- end }}
+          env:
+            - name: PLAYWRIGHT_BROWSERS_PATH
+              value: /ms-playwright
+          ports:
+            - name: websocket
+              containerPort: {{ .Values.playwright.port }}
+              protocol: TCP
+          startupProbe:
+            httpGet:
+              path: /json
+              port: websocket
+            failureThreshold: {{ .Values.startupProbe.failureThreshold }}
+            periodSeconds: {{ .Values.startupProbe.periodSeconds }}
+          readinessProbe:
+            httpGet:
+              path: /json
+              port: websocket
+            periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+          livenessProbe:
+            httpGet:
+              path: /json
+              port: websocket
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: temporary-files
+              mountPath: /tmp
+            {{- if .Values.sharedMemory.enabled }}
+            - name: shared-memory
+              mountPath: /dev/shm
+            {{- end }}
+      volumes:
+        - name: temporary-files
+          emptyDir: {}
+        {{- if .Values.sharedMemory.enabled }}
+        - name: shared-memory
+          emptyDir:
+            medium: Memory
+            sizeLimit: {{ .Values.sharedMemory.sizeLimit }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

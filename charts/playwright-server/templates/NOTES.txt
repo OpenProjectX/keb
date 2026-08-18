@@ -1,0 +1,13 @@
+{{- if .Values.httpRoute.enabled }}
+Playwright endpoint:
+{{- range .Values.httpRoute.hostnames }}
+  wss://{{ . }}{{ $.Values.playwright.path }}
+{{- end }}
+{{- else }}
+Forward the service locally:
+  kubectl -n {{ .Release.Namespace }} port-forward service/{{ include "playwright-server.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
+
+Playwright endpoint:
+  ws://127.0.0.1:{{ .Values.service.port }}{{ .Values.playwright.path }}
+{{- end }}
+

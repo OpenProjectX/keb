@@ -45,6 +45,7 @@ diagnostics, traces, videos, and Allure metadata.
 * link:getting-started.adoc[Getting started]
 * link:dsl.adoc[Pages, modules, and the Kotlin DSL]
 * link:configuration.adoc[Configuration and runtime properties]
+* link:playwright-kubernetes.adoc[Playwright server on Kubernetes]
 * link:reporting.adoc[Business-readable Allure reporting]
 * link:offline-image.adoc[Offline example Docker image]
 * link:corporate-network.adoc[Restricted corporate network setup]

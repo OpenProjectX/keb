@@ -65,7 +65,7 @@ back to the host artifact directory.
 == Remote browser in Docker
 
 The example can run the same journeys from the host JVM against a Playwright
-server in `ghcr.io/openprojectx/mcr/playwright:v1.62.1`:
+server in `ghcr.io/openprojectx/playwright-server:latest`:
 
 [source,shell]
 ----
@@ -78,8 +78,8 @@ The task uses `example/compose.yaml`, waits for the browser server, forwards
 the tests. It also disables local Playwright browser downloads. The browser
 reaches Vite through `http://host.docker.internal:4173`; the Compose
 configuration installs the Linux host-gateway mapping and adds that hostname
-to `NO_PROXY`. Docker Compose v2 and access to the Microsoft and npm registries
-are required on the first run.
+to `NO_PROXY`. Docker Compose v2 and access to GHCR for the initial image pull
+are required. Container startup itself performs no npm or browser download.
 
 == UI development
 

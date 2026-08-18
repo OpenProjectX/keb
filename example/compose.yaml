@@ -1,13 +1,8 @@
 services:
   playwright:
-    image: ghcr.io/openprojectx/mcr/playwright:v1.62.1
+    image: ghcr.io/openprojectx/playwright-server:latest
     init: true
-    user: pwuser
-    working_dir: /home/pwuser
-    command:
-      - /bin/sh
-      - -c
-      - npx -y playwright@1.62.1 run-server --port 3000 --host 0.0.0.0
+    stdin_open: true
     ports:
       - "127.0.0.1:3000:3000"
     environment:

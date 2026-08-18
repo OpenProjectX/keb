@@ -158,10 +158,10 @@ Then replace `:core:playwright` with `playwright` in installation commands.
 === Remote browser service
 
 A browser pod removes browser binaries and native libraries from the test
-runner. Mirror `ghcr.io/openprojectx/mcr/playwright:v1.62.1` into the internal
-container registry and bake `playwright@1.62.1` into the image from the JFrog
-npm repository; do not depend on `npx` reaching the public registry at pod
-startup.
+runner. Mirror `ghcr.io/openprojectx/playwright-server:latest` into the internal
+container registry. It already contains Playwright `1.62.1`, the server CLI,
+and matching browser binaries, so pod startup does not need an npm registry.
+Pin a published numeric image tag for controlled corporate environments.
 
 Expose the Playwright server with an internal ClusterIP Service, restrict it
 with a NetworkPolicy, and configure the test runner:

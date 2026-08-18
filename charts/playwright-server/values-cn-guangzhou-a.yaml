@@ -1,0 +1,15 @@
+fullnameOverride: playwright
+
+playwright:
+  maxClients: 2
+
+httpRoute:
+  enabled: true
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: k8s-infra-gateway
+      namespace: istio-ingress
+      sectionName: cluster-https
+  hostnames:
+    - playwright.cn-guangzhou-a.k8s.openprojectx.org

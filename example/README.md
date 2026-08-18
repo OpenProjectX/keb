@@ -40,6 +40,9 @@ Run the same tests against Playwright in Docker:
 ./gradlew -p example :testing:remoteTest
 ```
 
+For a Kubernetes Playwright server and deployed demo UI, see the
+[Kubernetes guide](../docs/playwright-kubernetes.adoc).
+
 Run the tests and generate the Allure HTML report:
 
 ```shell

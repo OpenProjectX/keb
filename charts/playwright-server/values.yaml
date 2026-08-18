@@ -1,0 +1,97 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/openprojectx/playwright-server
+  tag: latest
+  pullPolicy: Always
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+playwright:
+  version: 1.62.1
+  host: 0.0.0.0
+  port: 3000
+  path: /playwright
+  maxClients: 2
+  artifactsDirectory: /tmp/playwright-artifacts
+  unsafeLaunchOptions: false
+
+serviceAccount:
+  create: true
+  automount: false
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  # pwuser in the official Playwright image.
+  runAsUser: 1001
+  runAsGroup: 1001
+  fsGroup: 1001
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: false
+
+service:
+  type: ClusterIP
+  port: 3000
+
+httpRoute:
+  enabled: false
+  annotations: {}
+  parentRefs: []
+  hostnames: []
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: "2"
+    memory: 3Gi
+
+# Chromium uses /dev/shm for inter-process communication. Container runtimes
+# otherwise commonly provide only 64 MiB there.
+sharedMemory:
+  enabled: true
+  sizeLimit: 1Gi
+
+startupProbe:
+  failureThreshold: 60
+  periodSeconds: 2
+
+readinessProbe:
+  periodSeconds: 5
+  timeoutSeconds: 2
+
+livenessProbe:
+  periodSeconds: 10
+  timeoutSeconds: 2
+
+terminationGracePeriodSeconds: 90
+
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+topologySpreadConstraints: []

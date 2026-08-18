@@ -1,0 +1,11 @@
+apiVersion: v2
+name: playwright-server
+description: Long-running Playwright browser workers exposed through Gateway API
+type: application
+version: 0.1.0
+appVersion: "1.62.1"
+home: https://github.com/OpenProjectX/keb
+sources:
+  - https://github.com/OpenProjectX/keb
+  - https://github.com/microsoft/playwright
+
