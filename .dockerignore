@@ -14,3 +14,4 @@
 **/*.key
 **/*.pem
 **/local.properties
+.dependency-bundle-source

@@ -10,6 +10,9 @@ gradle_args=(
   --no-configuration-cache
   --no-build-cache
   "-PkebVersion=${KEB_VERSION}"
+  "-PkebDependencyBundleVersion=${KEB_DEPENDENCY_BUNDLE_VERSION}"
+  -PkebBundleRepository=/m2/repository
+  -PkebBundleOfflineOnly
 )
 
 # Dependencies and node_modules are part of the image. Force compilation, UI
@@ -21,6 +24,6 @@ gradle "${gradle_args[@]}" \
 
 # The Allure runtime was installed while building the image. Gradle sees the
 # just-completed tests as current and renders their results without a download.
-gradle "${gradle_args[@]}" :testing:allureReport
+gradle "${gradle_args[@]}" :testing:allureReport -x :ui:bunInstall
 
 echo "Allure report: /workspace/example/testing/build/reports/allure-report/allureReport/index.html"

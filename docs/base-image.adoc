@@ -1,0 +1,94 @@
+= Keb base image
+:toc:
+
+Each release publishes a reusable image for building and running Keb test
+projects:
+
+[source,text]
+----
+ghcr.io/openprojectx/keb-base:<version>
+ghcr.io/openprojectx/keb-base:latest
+----
+
+Use the versioned tag for reproducible test images. The image contains:
+
+* Java 17 and Gradle 9.4.1;
+* Bun 1.3.14;
+* Playwright and its installed browser and operating-system libraries, inherited
+  from `ghcr.io/openprojectx/playwright-server`;
+* the matching released `keb-core`, `keb-junit5`, and `keb-allure` artifacts;
+* the example JVM runtime and build dependency closure in `/m2/repository`;
+* the artifact-only Node distribution used to bootstrap the Allure renderer;
+* the dependency inventory in `/opt/keb/dependency-graph.json` and
+  `/opt/keb/dependency-graph.txt`.
+
+`KEB_VERSION` identifies the bundled Keb release and `KEB_M2_REPOSITORY` points
+to `/m2/repository`. The same repository is available through
+`/home/pwuser/.m2/repository` for builds that use `mavenLocal()`.
+
+The dependency repository is produced with `gradle-dependency-bundle`, not by
+copying a populated Gradle user cache. The image build verifies it with an empty
+Gradle home, Gradle `--offline`, and BuildKit network access disabled.
+
+== Extend the image
+
+[source,dockerfile]
+----
+FROM ghcr.io/openprojectx/keb-base:<version>
+
+USER root
+COPY --chown=pwuser:pwuser . /workspace
+USER pwuser
+WORKDIR /workspace
+
+RUN gradle --offline --no-daemon \
+      -PkebVersion="$KEB_VERSION" \
+      -PkebBundleRepository="$KEB_M2_REPOSITORY" \
+      testClasses
+
+CMD ["gradle", "--offline", "--no-daemon", "test"]
+----
+
+Configure both plugin and dependency resolution to use the bundled repository.
+For example, in `settings.gradle.kts`:
+
+[source,kotlin]
+----
+val kebRepository = System.getenv("KEB_M2_REPOSITORY") ?: "/m2/repository"
+
+pluginManagement {
+    repositories {
+        maven { url = uri(kebRepository) }
+    }
+}
+
+dependencyResolutionManagement {
+    repositories {
+        maven { url = uri(kebRepository) }
+    }
+}
+----
+
+Keep project-specific files in the derived image. JavaScript packages, custom
+JVM libraries, and other dependencies not used by the Keb example are not
+implicitly available. Install or bundle those while the derived image still
+has access to the required package repositories, then prove the final test
+command with `RUN --network=none`.
+
+== Build the base image locally
+
+The build uses a pinned checkout of `gradle-dependency-bundle` as a named
+BuildKit context:
+
+[source,shell]
+----
+docker build \
+  --build-context dependency-bundle-source=/data/Git/gradle-dependency-bundle \
+  --file docker/Dockerfile.keb-base \
+  --build-arg KEB_VERSION=0.1.9-SNAPSHOT \
+  --tag keb-base:local \
+  .
+----
+
+The release workflow performs the same build from a pinned dependency-bundle
+commit and publishes versioned and `latest` tags.

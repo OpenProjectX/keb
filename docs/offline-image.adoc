@@ -9,10 +9,10 @@ ghcr.io/openprojectx/keb-example:latest
 ----
 
 The versioned image is built from the matching `keb-<version>` Git tag. It
-contains the complete source tree, locally published Keb Maven artifacts,
-compiled example outputs, Gradle distribution and dependency cache, Bun and
-`node_modules`, Chromium with its operating-system libraries, and the installed
-Allure report runtime.
+extends `ghcr.io/openprojectx/keb-base:<version>` and contains the complete
+source tree, the independent example's `node_modules`, compiled outputs, and
+the installed Allure report runtime. The base supplies Java, Gradle, Bun,
+Playwright, Chromium, and the portable Maven repository at `/m2/repository`.
 
 == Run without internet
 
@@ -61,8 +61,16 @@ dependencies.
 [source,shell]
 ----
 docker build \
+  --build-context dependency-bundle-source=/data/Git/gradle-dependency-bundle \
+  --file docker/Dockerfile.keb-base \
+  --build-arg KEB_VERSION=0.1.9-SNAPSHOT \
+  --tag keb-base:local \
+  .
+
+docker build \
   --file docker/Dockerfile.offline-example \
-  --build-arg KEB_VERSION=0.1.6-SNAPSHOT \
+  --build-arg KEB_BASE_IMAGE=keb-base:local \
+  --build-arg KEB_VERSION=0.1.9-SNAPSHOT \
   --tag keb-example:local \
   .
 ----
@@ -71,3 +79,5 @@ The Dockerfile performs its final smoke test with BuildKit
 `RUN --network=none`. Image creation fails if the example or report renderer
 attempts an internet download.
 
+See link:base-image.adoc[Keb base image] for creating a separate test project
+on top of the reusable toolchain and Maven bundle.

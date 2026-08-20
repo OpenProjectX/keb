@@ -83,7 +83,10 @@ If the workflow fails, test reports, build reports, and Keb failure artifacts
 are uploaded for diagnosis.
 
 After the Maven/Git release succeeds, a separate job checks out the exact
-`keb-<version>` tag and publishes `ghcr.io/openprojectx/keb-example:<version>`
-and `latest`. The Dockerfile runs the example tests and Allure renderer in a
-network-disabled build step before the image is pushed. See
+`keb-<version>` tag. It builds and publishes
+`ghcr.io/openprojectx/keb-base:<version>` first, then builds the matching
+`ghcr.io/openprojectx/keb-example:<version>` on top of it. Both also receive a
+`latest` tag. The base is verified from an empty Gradle home with no network;
+the derived image runs the example tests and Allure renderer in a
+network-disabled build step. See link:base-image.adoc[Keb base image] and
 link:offline-image.adoc[Offline example image].

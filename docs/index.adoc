@@ -47,6 +47,7 @@ diagnostics, traces, videos, and Allure metadata.
 * link:configuration.adoc[Configuration and runtime properties]
 * link:playwright-kubernetes.adoc[Playwright server on Kubernetes]
 * link:reporting.adoc[Business-readable Allure reporting]
+* link:base-image.adoc[Reusable Keb base image]
 * link:offline-image.adoc[Offline example Docker image]
 * link:corporate-network.adoc[Restricted corporate network setup]
 * link:example.adoc[Independent React and Material UI example]

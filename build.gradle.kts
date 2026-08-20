@@ -15,6 +15,10 @@ plugins {
 
 }
 
+val kebBaseRepositoryDirectory = providers.gradleProperty("kebBaseRepository")
+    .map { file(it) }
+    .orElse(layout.buildDirectory.dir("keb-base/m2/repository").map { it.asFile })
+
 allprojects {
     group = "org.openprojectx.test.keb"
 }
@@ -47,6 +51,10 @@ subprojects {
                 maven {
                     name = "example"
                     url = rootProject.layout.buildDirectory.dir("example-maven").get().asFile.toURI()
+                }
+                maven {
+                    name = "kebBase"
+                    url = kebBaseRepositoryDirectory.get().toURI()
                 }
             }
 
@@ -117,6 +125,16 @@ tasks.register("publishExampleArtifacts") {
         ":core:publishMavenJavaPublicationToExampleRepository",
         ":junit5:publishMavenJavaPublicationToExampleRepository",
         ":allure:publishMavenJavaPublicationToExampleRepository",
+    )
+}
+
+tasks.register("publishKebBaseArtifacts") {
+    group = "publishing"
+    description = "Publishes this Keb version into the Maven repository embedded in the Keb base image"
+    dependsOn(
+        ":core:publishMavenJavaPublicationToKebBaseRepository",
+        ":junit5:publishMavenJavaPublicationToKebBaseRepository",
+        ":allure:publishMavenJavaPublicationToKebBaseRepository",
     )
 }
 

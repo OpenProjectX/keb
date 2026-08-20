@@ -29,14 +29,33 @@ kotlin {
 // The Allure report plugin adds a project repository for its runtime. Repeat
 // the consumer repositories here so Gradle still resolves the test classpath.
 repositories {
-    maven {
-        name = "kebLocal"
-        url = uri(rootProject.file("../build/example-maven"))
-        content {
-            includeGroup("org.openprojectx.test.keb")
+    val offlineOnly = providers.gradleProperty("kebBundleOfflineOnly").isPresent
+    val bundleRepository = providers.gradleProperty("kebBundleRepository").orNull
+    if (bundleRepository != null) {
+        maven {
+            name = "kebBundle"
+            url = uri(bundleRepository)
+            metadataSources {
+                gradleMetadata()
+                mavenPom()
+                artifact()
+            }
+            if (!offlineOnly) {
+                content { includeGroupByRegex("org\\.openprojectx(\\..*)?") }
+            }
+        }
+    } else {
+        maven {
+            name = "kebLocal"
+            url = uri(rootProject.file("../build/example-maven"))
+            content {
+                includeGroup("org.openprojectx.test.keb")
+            }
         }
     }
-    mavenCentral()
+    if (!offlineOnly) {
+        mavenCentral()
+    }
 }
 
 dependencies {

@@ -1,0 +1,110 @@
+# syntax=docker/dockerfile:1.7
+
+ARG GRADLE_VERSION=9.4.1
+ARG BUN_VERSION=1.3.14
+ARG PLAYWRIGHT_SERVER_IMAGE=ghcr.io/openprojectx/playwright-server:latest
+ARG DEPENDENCY_BUNDLE_VERSION=0.1.2-SNAPSHOT
+
+FROM oven/bun:${BUN_VERSION} AS bun-runtime
+
+FROM gradle:${GRADLE_VERSION}-jdk17 AS dependency-bundle-builder
+
+ENV CI=true
+WORKDIR /dependency-bundle
+COPY --from=dependency-bundle-source --chown=gradle:gradle . .
+RUN chown gradle:gradle /dependency-bundle
+USER gradle
+RUN gradle --no-daemon --no-configuration-cache publishBundleArtifacts
+
+FROM gradle:${GRADLE_VERSION}-jdk17 AS bundle
+
+ARG KEB_VERSION
+ARG DEPENDENCY_BUNDLE_VERSION
+
+ENV CI=true
+WORKDIR /workspace
+COPY --chown=gradle:gradle . .
+RUN chown gradle:gradle /workspace
+COPY --from=dependency-bundle-builder --chown=gradle:gradle \
+  /dependency-bundle/build/dependency-bundle/m2/repository \
+  /workspace/build/keb-base/m2/repository
+USER gradle
+
+# Publish the released Keb modules and merge the example's runtime and build
+# dependency closure into one portable Maven-layout repository.
+RUN gradle --no-daemon --no-configuration-cache \
+      -PkebBaseRepository=/workspace/build/keb-base/m2/repository \
+      publishKebBaseArtifacts
+
+RUN gradle -p example --no-daemon --no-configuration-cache \
+      -PkebVersion="${KEB_VERSION}" \
+      -PkebDependencyBundleVersion="${DEPENDENCY_BUNDLE_VERSION}" \
+      -PkebBundleRepository=/workspace/build/keb-base/m2/repository \
+      -PkebBundleOutput=/workspace/build/keb-base \
+      dependencyBundleReport
+
+# Enrich the captured component graph with conventional Maven POM metadata.
+# Gradle plugin variants still use their .module metadata; the POM closure
+# makes the repository independently consumable from an empty Gradle home.
+RUN gradle -p example --no-daemon --no-configuration-cache \
+      -PkebVersion="${KEB_VERSION}" \
+      -PkebDependencyBundleVersion="${DEPENDENCY_BUNDLE_VERSION}" \
+      -PkebBundleRepository=/workspace/build/keb-base/m2/repository \
+      -PkebBundleOutput=/workspace/build/keb-base \
+      dependencyBundleReport
+
+# Prove the repository is sufficient with no network and a clean Gradle home.
+RUN --network=none GRADLE_USER_HOME=/tmp/keb-base-verification-gradle-home \
+    gradle -p example --offline --no-daemon --no-configuration-cache \
+      -PkebVersion="${KEB_VERSION}" \
+      -PkebDependencyBundleVersion="${DEPENDENCY_BUNDLE_VERSION}" \
+      -PkebBundleRepository=/workspace/build/keb-base/m2/repository \
+      -PkebBundleOfflineOnly \
+      :testing:testClasses
+
+FROM ${PLAYWRIGHT_SERVER_IMAGE} AS runtime
+
+ARG KEB_VERSION
+ARG DEPENDENCY_BUNDLE_VERSION
+
+LABEL org.opencontainers.image.title="Keb base" \
+      org.opencontainers.image.description="Keb, its Maven runtime dependency bundle, Gradle, Bun, Playwright, and browsers" \
+      org.opencontainers.image.source="https://github.com/OpenProjectX/keb" \
+      org.opencontainers.image.version="${KEB_VERSION}"
+
+USER root
+
+ENV CI=true \
+    KEB_VERSION=${KEB_VERSION} \
+    KEB_DEPENDENCY_BUNDLE_VERSION=${DEPENDENCY_BUNDLE_VERSION} \
+    KEB_M2_REPOSITORY=/m2/repository \
+    JAVA_HOME=/opt/java/openjdk \
+    GRADLE_HOME=/opt/gradle \
+    GRADLE_USER_HOME=/home/pwuser/.gradle \
+    GRADLE_OPTS=-Dmaven.repo.local=/m2/repository \
+    BUN_INSTALL=/home/pwuser/.bun \
+    BUN_INSTALL_CACHE_DIR=/home/pwuser/.bun/install/cache \
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
+    PATH=/opt/java/openjdk/bin:/opt/gradle/bin:/home/pwuser/.bun/bin:${PATH}
+
+COPY --from=bundle /opt/java/openjdk /opt/java/openjdk
+COPY --from=bundle /opt/gradle /opt/gradle
+COPY --from=bun-runtime /usr/local/bin/bun /usr/local/bin/bun
+COPY --from=bundle --chown=pwuser:pwuser /workspace/build/keb-base/m2 /m2
+COPY --from=bundle --chown=pwuser:pwuser \
+  /workspace/build/keb-base/dependency-graph.json \
+  /workspace/build/keb-base/dependency-graph.txt \
+  /opt/keb/
+
+RUN mkdir -p /home/pwuser/.gradle /home/pwuser/.m2 /home/pwuser/.bun \
+    && ln -sfn /m2/repository /home/pwuser/.m2/repository \
+    && chown -R pwuser:pwuser /home/pwuser /opt/keb
+
+WORKDIR /workspace
+USER pwuser
+
+# The Playwright server base has a server entrypoint. Keb base images are
+# intended to be extended by test projects, so reset it to a normal shell.
+ENTRYPOINT []
+CMD ["bash"]

@@ -258,6 +258,13 @@ jobs:
         with:
           ref: ${{ needs.release.outputs.release_tag }}
 
+      - name: Checkout dependency bundle source
+        uses: actions/checkout@v4
+        with:
+          repository: OpenProjectX/gradle-dependency-bundle
+          ref: b1cc63e6aba759753212155f61d9f076abca7c3f
+          path: .dependency-bundle-source
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -268,7 +275,23 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build, verify offline, and publish image
+      - name: Build and publish Keb base image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile.keb-base
+          push: true
+          build-contexts: |
+            dependency-bundle-source=.dependency-bundle-source
+          build-args: |
+            KEB_VERSION=${{ needs.release.outputs.release_version }}
+          tags: |
+            ghcr.io/openprojectx/keb-base:${{ needs.release.outputs.release_version }}
+            ghcr.io/openprojectx/keb-base:latest
+          cache-from: type=gha,scope=keb-base
+          cache-to: type=gha,mode=max,scope=keb-base
+
+      - name: Build, verify offline, and publish example image
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -276,6 +299,7 @@ jobs:
           push: true
           build-args: |
             KEB_VERSION=${{ needs.release.outputs.release_version }}
+            KEB_BASE_IMAGE=ghcr.io/openprojectx/keb-base:${{ needs.release.outputs.release_version }}
           tags: |
             ghcr.io/openprojectx/keb-example:${{ needs.release.outputs.release_version }}
             ghcr.io/openprojectx/keb-example:latest
@@ -287,6 +311,7 @@ jobs:
           {
             echo "## Offline example image"
             echo
+            echo "- Base image: \`ghcr.io/openprojectx/keb-base:${{ needs.release.outputs.release_version }}\`"
             echo "- Image: \`ghcr.io/openprojectx/keb-example:${{ needs.release.outputs.release_version }}\`"
             echo "- Source tag: \`${{ needs.release.outputs.release_tag }}\`"
             echo "- Offline browser test and Allure report generation: verified during image build"

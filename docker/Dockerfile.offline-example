@@ -1,74 +1,45 @@
 # syntax=docker/dockerfile:1.7
 
-ARG GRADLE_VERSION=9.4.1
-ARG BUN_VERSION=1.3.14
-ARG PLAYWRIGHT_VERSION=1.62.1
-
-FROM oven/bun:${BUN_VERSION} AS bun-runtime
-
-FROM gradle:${GRADLE_VERSION}-jdk17 AS prepare
-
-USER root
-COPY --from=bun-runtime /usr/local/bin/bun /usr/local/bin/bun
-
-ENV CI=true \
-    BUN_INSTALL_CACHE_DIR=/home/gradle/.bun/install/cache
-
-WORKDIR /workspace
-COPY --chown=gradle:gradle . .
-RUN chown gradle:gradle /workspace
-
-USER gradle
-ARG KEB_VERSION
-
-# Resolve and retain every JVM/UI/report dependency, publish the Keb modules
-# into the repository-local Maven repository, and compile all example code.
-RUN gradle --no-daemon --no-configuration-cache publishExampleArtifacts
-
-RUN gradle -p example --no-daemon --no-configuration-cache \
-      -PkebVersion="${KEB_VERSION}" \
-      :ui:bunBuild \
-      :testing:testClasses \
-      :testing:resolveTestRuntimeDependencies
-
-FROM mcr.microsoft.com/playwright:v${PLAYWRIGHT_VERSION} AS runtime
+ARG KEB_BASE_IMAGE=ghcr.io/openprojectx/keb-base:latest
+FROM ${KEB_BASE_IMAGE}
 
 ARG KEB_VERSION
 
 LABEL org.opencontainers.image.title="Keb offline example" \
-      org.opencontainers.image.description="Keb sources, artifacts, dependencies, Chromium, and Allure report runtime" \
+      org.opencontainers.image.description="Keb example source and report runtime layered on the reusable Keb base image" \
       org.opencontainers.image.source="https://github.com/OpenProjectX/keb" \
       org.opencontainers.image.version="${KEB_VERSION}"
 
-ENV CI=true \
-    KEB_VERSION=${KEB_VERSION} \
-    JAVA_HOME=/opt/java/openjdk \
-    GRADLE_HOME=/opt/gradle \
-    GRADLE_USER_HOME=/home/pwuser/.gradle \
-    BUN_INSTALL=/home/pwuser/.bun \
-    BUN_INSTALL_CACHE_DIR=/home/pwuser/.bun/install/cache \
-    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
-    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
-    PATH=/opt/java/openjdk/bin:/opt/gradle/bin:/home/pwuser/.bun/bin:${PATH}
+ENV KEB_VERSION=${KEB_VERSION}
 
-COPY --from=prepare /opt/java/openjdk /opt/java/openjdk
-COPY --from=prepare /opt/gradle /opt/gradle
-COPY --from=bun-runtime /usr/local/bin/bun /usr/local/bin/bun
-COPY --from=prepare --chown=pwuser:pwuser /home/gradle/.gradle /home/pwuser/.gradle
-COPY --from=prepare --chown=pwuser:pwuser /home/gradle/.bun /home/pwuser/.bun
-COPY --from=prepare --chown=pwuser:pwuser /workspace /workspace
-
-WORKDIR /workspace
+USER root
+COPY --chown=pwuser:pwuser . /workspace
 USER pwuser
+WORKDIR /workspace
 
-# Install the report runtime while network access is still available. The
-# Playwright base supplies Node and its native libraries for Allure's npm step.
-RUN gradle -p example --no-daemon --no-configuration-cache \
+# Only project-specific JavaScript and report assets are added here. All JVM
+# plugins, Keb modules, and runtime dependencies resolve from /m2/repository.
+RUN bun install --cwd example/ui --frozen-lockfile
+
+RUN gradle -p example --offline --no-daemon --no-configuration-cache \
       -PkebVersion="${KEB_VERSION}" \
+      -PkebDependencyBundleVersion="${KEB_DEPENDENCY_BUNDLE_VERSION}" \
+      -PkebBundleRepository=/m2/repository \
+      -PkebBundleOfflineOnly \
+      :ui:bunBuild \
+      :testing:testClasses \
+      -x :ui:bunInstall
+
+RUN gradle -p example --offline --no-daemon --no-configuration-cache \
+      -PkebVersion="${KEB_VERSION}" \
+      -PkebDependencyBundleVersion="${KEB_DEPENDENCY_BUNDLE_VERSION}" \
+      -PkebBundleRepository=/m2/repository \
+      -PkebBundleOfflineOnly \
       :testing:downloadAllure
 
 # BuildKit denies network access for this smoke test. A successful image build
-# therefore proves that tests and HTML report generation use only baked data.
+# proves compilation, UI build, browser tests, and report generation use only
+# the base image and project-specific files installed above.
 RUN --network=none ./docker/run-offline-example.sh
 
 CMD ["./docker/run-offline-example.sh"]

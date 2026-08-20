@@ -57,6 +57,8 @@ For a shared remote browser, see the
 [Playwright Kubernetes Helm chart](docs/playwright-kubernetes.adoc).
 Released versions also include a self-contained
 [offline example image](docs/offline-image.adoc).
+Build custom test images from the reusable
+[Keb base image](docs/base-image.adoc).
 
 ## Build
 
